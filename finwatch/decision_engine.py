@@ -227,9 +227,7 @@ class InterventionEngine:
         logger.info("Thresholds saved to %s", path)
 
     @classmethod
-    def load_thresholds(
-        cls, path: str = "data/external/thresholds.json"
-    ) -> "InterventionEngine":
+    def load_thresholds(cls, path: str = "data/external/thresholds.json") -> "InterventionEngine":
         """Load a previously calibrated InterventionEngine from disk."""
         import json
 

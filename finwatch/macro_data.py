@@ -60,9 +60,7 @@ def get_macro_snapshot(use_cache: bool = True) -> dict:
             snapshot[feature_name] = value
             logger.info("ONS %s (%s) = %.3f", feature_name, series_id, value)
         except Exception as e:
-            logger.warning(
-                "Failed to fetch ONS series %s: %s - using None", series_id, e
-            )
+            logger.warning("Failed to fetch ONS series %s: %s - using None", series_id, e)
             snapshot[feature_name] = None
 
     _write_cache(snapshot)
@@ -90,9 +88,7 @@ def _fetch_series_latest(series_id: str) -> float:
     return float(latest["value"])
 
 
-def save_macro_baseline(
-    snapshot: dict, path: str = "data/external/macro_baseline.json"
-):
+def save_macro_baseline(snapshot: dict, path: str = "data/external/macro_baseline.json"):
     """
     Save current macro snapshot as the training-time baseline.
 
@@ -132,9 +128,7 @@ def check_macro_drift(
     sigma_threshold   : number of standard deviations to trigger alert
     """
     if not Path(baseline_path).exists():
-        logger.warning(
-            "No macro baseline found at %s - skipping drift check.", baseline_path
-        )
+        logger.warning("No macro baseline found at %s - skipping drift check.", baseline_path)
         return {"should_retrain": False, "drifted_features": [], "max_drift_sigma": 0.0}
 
     with open(baseline_path) as f:
@@ -203,6 +197,4 @@ def _read_cache() -> dict:
 def _write_cache(values: dict):
     _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(_CACHE_FILE, "w") as f:
-        json.dump(
-            {"fetched_at": datetime.utcnow().isoformat(), "values": values}, f, indent=2
-        )
+        json.dump({"fetched_at": datetime.utcnow().isoformat(), "values": values}, f, indent=2)

@@ -19,7 +19,9 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
 
       - name: Lint with flake8
         run: flake8 finwatch/ api/ training/ monitoring/ --max-line-length=100

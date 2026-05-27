@@ -19,15 +19,11 @@ class CustomerRecord(BaseModel):
     AMT_INCOME_TOTAL: float = Field(..., description="Annual income (£)")
     AMT_CREDIT: float = Field(..., description="Total credit outstanding (£)")
     AMT_ANNUITY: float = Field(..., description="Monthly loan annuity (£)")
-    AMT_GOODS_PRICE: float = Field(
-        ..., description="Price of goods for which loan was given"
-    )
+    AMT_GOODS_PRICE: float = Field(..., description="Price of goods for which loan was given")
     CODE_GENDER: str = Field(..., description="M or F")
     DAYS_BIRTH: int = Field(..., description="Days since birth (negative integer)")
     DAYS_EMPLOYED: int = Field(..., description="Days since last employment start")
-    NAME_INCOME_TYPE: str = Field(
-        ..., description="Working / Pensioner / State servant / etc."
-    )
+    NAME_INCOME_TYPE: str = Field(..., description="Working / Pensioner / State servant / etc.")
     NAME_EDUCATION_TYPE: str = Field(..., description="Highest education level")
     NAME_FAMILY_STATUS: str = Field(..., description="Married / Single / etc.")
     EXT_SOURCE_1: Optional[float] = Field(
@@ -64,9 +60,7 @@ class CustomerRecord(BaseModel):
 class BatchRequest(BaseModel):
     """Batch of customer records for portfolio scoring."""
 
-    customers: List[CustomerRecord] = Field(
-        ..., description="List of customer records to score"
-    )
+    customers: List[CustomerRecord] = Field(..., description="List of customer records to score")
 
 
 # -- Response ------------------------------------------------------------------
@@ -86,14 +80,10 @@ class ScoreResponse(BaseModel):
     tier: str = Field(..., description="MONITOR / OUTREACH / ESCALATE")
     threshold_escalate: float = Field(..., description="Threshold used for ESCALATE")
     threshold_outreach: float = Field(..., description="Threshold used for OUTREACH")
-    top_shap_features: List[SHAPFeature] = Field(
-        ..., description="Top features driving this score"
-    )
+    top_shap_features: List[SHAPFeature] = Field(..., description="Top features driving this score")
     model_version: str = Field(..., description="Model version used for scoring")
     scored_at: str = Field(..., description="UTC timestamp of scoring")
-    macro_snapshot: dict = Field(
-        ..., description="ONS macro indicators used at scoring time"
-    )
+    macro_snapshot: dict = Field(..., description="ONS macro indicators used at scoring time")
 
 
 class BatchResponse(BaseModel):

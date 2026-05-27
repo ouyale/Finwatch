@@ -38,9 +38,7 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 # -- Evaluation ----------------------------------------------------------------
 
 
-def evaluate_model(
-    model, X: pd.DataFrame, y: np.ndarray, split_name: str = "val"
-) -> dict:
+def evaluate_model(model, X: pd.DataFrame, y: np.ndarray, split_name: str = "val") -> dict:
     """Compute the full evaluation suite for a fitted model."""
     y_prob = model.predict_proba(X)[:, 1]
     metrics = {
@@ -172,9 +170,7 @@ def train_xgboost(
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
 
     best_params = study.best_params
-    best_params.update(
-        {"scale_pos_weight": scale_pos_weight, "random_state": 42, "verbosity": 0}
-    )
+    best_params.update({"scale_pos_weight": scale_pos_weight, "random_state": 42, "verbosity": 0})
 
     logger.info("Best XGBoost PR-AUC (val): %.4f", study.best_value)
 

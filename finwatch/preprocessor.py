@@ -152,9 +152,7 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
 
         for col in cat_cols:
             if fit:
-                mapping = {
-                    v: i for i, v in enumerate(sorted(df[col].dropna().unique()))
-                }
+                mapping = {v: i for i, v in enumerate(sorted(df[col].dropna().unique()))}
                 mapping["__unknown__"] = -1
                 self._cat_encodings[col] = mapping
             enc = self._cat_encodings.get(col, {})
@@ -172,9 +170,7 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
           - Fill missing with sentinel value -1 (not median)
         """
         ext_sources = [
-            c
-            for c in ["EXT_SOURCE_1", "EXT_SOURCE_2", "EXT_SOURCE_3"]
-            if c in df.columns
+            c for c in ["EXT_SOURCE_1", "EXT_SOURCE_2", "EXT_SOURCE_3"] if c in df.columns
         ]
         for col in ext_sources:
             df[f"has_{col.lower()}"] = df[col].notna().astype(int)
@@ -193,9 +189,7 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
 
     def _check_fitted(self):
         if not self._fitted:
-            raise RuntimeError(
-                "CustomerPreprocessor has not been fitted. Call .fit() first."
-            )
+            raise RuntimeError("CustomerPreprocessor has not been fitted. Call .fit() first.")
 
     # -- Properties ------------------------------------------------------------
 

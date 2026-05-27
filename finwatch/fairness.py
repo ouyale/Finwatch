@@ -100,9 +100,7 @@ def disparate_impact_audit(
             "passed": passed,
             "max_rate": round(float(max_rate), 4),
             "min_rate": round(float(min_rate), 4),
-            "group_rates": group_rates.set_index(col)["positive_rate"]
-            .round(4)
-            .to_dict(),
+            "group_rates": group_rates.set_index(col)["positive_rate"].round(4).to_dict(),
         }
 
     return {

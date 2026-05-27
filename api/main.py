@@ -56,9 +56,7 @@ async def lifespan(app: FastAPI):
     _state["preprocessor"] = joblib.load(artefact_dir / ARTEFACT_PREPROCESSOR)
     _state["model"] = joblib.load(artefact_dir / ARTEFACT_MODEL)
     _state["explainer"] = joblib.load(artefact_dir / ARTEFACT_SHAP_EXPLAINER)
-    _state["engine"] = InterventionEngine.load_thresholds(
-        str(artefact_dir / "thresholds.json")
-    )
+    _state["engine"] = InterventionEngine.load_thresholds(str(artefact_dir / "thresholds.json"))
     _state["model_version"] = "0.1.0"  # TODO: read from MLflow registry
 
     logger.info(

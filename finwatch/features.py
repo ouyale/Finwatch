@@ -24,26 +24,20 @@ def engineer_financial_ratios(df: pd.DataFrame) -> pd.DataFrame:
 
     # How much credit relative to income - high values signal overextension
     if {"AMT_CREDIT", "AMT_INCOME_TOTAL"}.issubset(df.columns):
-        df["credit_to_income_ratio"] = df["AMT_CREDIT"] / df[
-            "AMT_INCOME_TOTAL"
-        ].replace(0, np.nan)
+        df["credit_to_income_ratio"] = df["AMT_CREDIT"] / df["AMT_INCOME_TOTAL"].replace(0, np.nan)
 
     # Monthly repayment burden relative to income
     if {"AMT_ANNUITY", "AMT_INCOME_TOTAL"}.issubset(df.columns):
-        df["annuity_to_income_ratio"] = df["AMT_ANNUITY"] / df[
-            "AMT_INCOME_TOTAL"
-        ].replace(0, np.nan)
-
-    # Credit relative to actual goods value - large gap may signal cash extraction
-    if {"AMT_CREDIT", "AMT_GOODS_PRICE"}.issubset(df.columns):
-        df["credit_to_goods_ratio"] = df["AMT_CREDIT"] / df["AMT_GOODS_PRICE"].replace(
+        df["annuity_to_income_ratio"] = df["AMT_ANNUITY"] / df["AMT_INCOME_TOTAL"].replace(
             0, np.nan
         )
 
+    # Credit relative to actual goods value - large gap may signal cash extraction
+    if {"AMT_CREDIT", "AMT_GOODS_PRICE"}.issubset(df.columns):
+        df["credit_to_goods_ratio"] = df["AMT_CREDIT"] / df["AMT_GOODS_PRICE"].replace(0, np.nan)
+
     # Aggregate external credit bureau scores (handle -1 sentinel)
-    ext_cols = [
-        c for c in ["EXT_SOURCE_1", "EXT_SOURCE_2", "EXT_SOURCE_3"] if c in df.columns
-    ]
+    ext_cols = [c for c in ["EXT_SOURCE_1", "EXT_SOURCE_2", "EXT_SOURCE_3"] if c in df.columns]
     if ext_cols:
         valid = df[ext_cols].replace(-1, np.nan)
         df["ext_source_mean"] = valid.mean(axis=1)

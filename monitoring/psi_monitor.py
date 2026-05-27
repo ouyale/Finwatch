@@ -45,9 +45,7 @@ def compute_psi(
     actual_counts = np.histogram(actual, bins=breakpoints)[0]
 
     # Convert to proportions, avoiding division by zero
-    expected_pct = np.where(
-        expected_counts == 0, 0.0001, expected_counts / len(expected)
-    )
+    expected_pct = np.where(expected_counts == 0, 0.0001, expected_counts / len(expected))
     actual_pct = np.where(actual_counts == 0, 0.0001, actual_counts / len(actual))
 
     psi = np.sum((actual_pct - expected_pct) * np.log(actual_pct / expected_pct))

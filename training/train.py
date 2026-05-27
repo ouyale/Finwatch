@@ -14,8 +14,6 @@ Usage
 
 import argparse
 import logging
-import sys
-from pathlib import Path
 
 import joblib
 import mlflow
@@ -24,10 +22,7 @@ import pandas as pd
 from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split
 
-# Add project root to path so finwatch package is importable when run directly
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from finwatch.constants import (  # noqa: E402
+from finwatch.constants import (
     ARTEFACT_MODEL,
     ARTEFACT_PREPROCESSOR,
     ARTEFACT_SHAP_EXPLAINER,
@@ -36,19 +31,19 @@ from finwatch.constants import (  # noqa: E402
     MLFLOW_EXPERIMENT,
     TARGET,
 )
-from finwatch.decision_engine import InterventionEngine  # noqa: E402
-from finwatch.explainability import get_explainer  # noqa: E402
-from finwatch.fairness import disparate_impact_audit, fairness_gate  # noqa: E402
-from finwatch.features import run_all  # noqa: E402
-from finwatch.macro_data import get_macro_snapshot, save_macro_baseline  # noqa: E402
-from finwatch.models import (  # noqa: E402
+from finwatch.decision_engine import InterventionEngine
+from finwatch.explainability import get_explainer
+from finwatch.fairness import disparate_impact_audit, fairness_gate
+from finwatch.features import run_all
+from finwatch.macro_data import get_macro_snapshot, save_macro_baseline
+from finwatch.models import (
     evaluate_model,
     select_champion,
     train_lightgbm,
     train_logistic_regression,
     train_xgboost,
 )
-from finwatch.preprocessor import CustomerPreprocessor  # noqa: E402
+from finwatch.preprocessor import CustomerPreprocessor
 
 logging.basicConfig(
     level=logging.INFO,
@@ -83,9 +78,7 @@ def main(args):
     X_train, X_val, y_train, y_val = train_test_split(
         X_temp, y_temp, test_size=0.25, stratify=y_temp, random_state=42
     )
-    logger.info(
-        "Split: train=%d  val=%d  test=%d", len(X_train), len(X_val), len(X_test)
-    )
+    logger.info("Split: train=%d  val=%d  test=%d", len(X_train), len(X_val), len(X_test))
 
     # -- 3. Preprocess --------------------------------------------------------─
     preprocessor = CustomerPreprocessor()
@@ -139,9 +132,7 @@ def main(args):
         }
 
         # -- 7. Select champion ------------------------------------------------
-        champion_name, champion_model, val_metrics = select_champion(
-            models, X_val_feat, y_val
-        )
+        champion_name, champion_model, val_metrics = select_champion(models, X_val_feat, y_val)
 
         # Log all model metrics
         for model_name, metrics in val_metrics.items():
@@ -167,9 +158,7 @@ def main(args):
         val_indices = X_val.index
         fairness_val = fairness_df.loc[fairness_df.index.isin(val_indices)].copy()
         fairness_val["tier"] = engine.predict_batch(
-            pd.DataFrame(
-                {"vulnerability_score": champion_model.predict_proba(X_val_feat)[:, 1]}
-            )
+            pd.DataFrame({"vulnerability_score": champion_model.predict_proba(X_val_feat)[:, 1]})
         )["tier"].values
 
         audit_result = disparate_impact_audit(fairness_val)
@@ -190,9 +179,7 @@ def main(args):
         engine.save_thresholds(f"data/processed/{ARTEFACT_THRESHOLDS}")
 
         # SHAP explainer
-        explainer = get_explainer(
-            champion_model, X_train_feat.sample(500, random_state=42)
-        )
+        explainer = get_explainer(champion_model, X_train_feat.sample(500, random_state=42))
         joblib.dump(explainer, f"data/processed/{ARTEFACT_SHAP_EXPLAINER}")
 
         # Save macro baseline for drift monitoring
@@ -214,9 +201,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Train the FinWatch vulnerability model"
-    )
+    parser = argparse.ArgumentParser(description="Train the FinWatch vulnerability model")
     parser.add_argument("--data-path", default="data/raw/application_train.csv")
     parser.add_argument("--experiment", default=MLFLOW_EXPERIMENT)
     parser.add_argument("--n-trials", type=int, default=50)
