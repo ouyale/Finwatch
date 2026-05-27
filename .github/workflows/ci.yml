@@ -1,0 +1,34 @@
+name: FinWatch CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint with flake8
+        run: flake8 finwatch/ api/ training/ monitoring/ --max-line-length=100
+
+      - name: Check formatting with black
+        run: black --check finwatch/ api/ training/ monitoring/
+
+      - name: Run tests with coverage
+        run: pytest tests/ -v --cov=finwatch --cov-report=term-missing
+
+      - name: Check test coverage >= 70%
+        run: pytest tests/ --cov=finwatch --cov-fail-under=70
