@@ -37,17 +37,21 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 # -- Evaluation ----------------------------------------------------------------
 
-def evaluate_model(model, X: pd.DataFrame, y: np.ndarray, split_name: str = "val") -> dict:
+
+def evaluate_model(
+    model, X: pd.DataFrame, y: np.ndarray, split_name: str = "val"
+) -> dict:
     """Compute the full evaluation suite for a fitted model."""
     y_prob = model.predict_proba(X)[:, 1]
     metrics = {
-        f"{split_name}_pr_auc":   round(average_precision_score(y, y_prob), 4),
-        f"{split_name}_roc_auc":  round(roc_auc_score(y, y_prob), 4),
-        f"{split_name}_brier":    round(brier_score_loss(y, y_prob), 4),
-        f"{split_name}_gini":     round(2 * roc_auc_score(y, y_prob) - 1, 4),
+        f"{split_name}_pr_auc": round(average_precision_score(y, y_prob), 4),
+        f"{split_name}_roc_auc": round(roc_auc_score(y, y_prob), 4),
+        f"{split_name}_brier": round(brier_score_loss(y, y_prob), 4),
+        f"{split_name}_gini": round(2 * roc_auc_score(y, y_prob) - 1, 4),
     }
     # KS statistic - max separation between default and non-default distributions
     from scipy.stats import ks_2samp
+
     pos_scores = y_prob[y == 1]
     neg_scores = y_prob[y == 0]
     ks_stat, _ = ks_2samp(pos_scores, neg_scores)
@@ -59,6 +63,7 @@ def evaluate_model(model, X: pd.DataFrame, y: np.ndarray, split_name: str = "val
 
 
 # -- Baseline: Logistic Regression --------------------------------------------
+
 
 def train_logistic_regression(
     X_train: pd.DataFrame,
@@ -79,6 +84,7 @@ def train_logistic_regression(
 
 # -- Champion: LightGBM with Optuna --------------------------------------------
 
+
 def train_lightgbm(
     X_train: pd.DataFrame,
     y_train: np.ndarray,
@@ -93,18 +99,18 @@ def train_lightgbm(
 
     def objective(trial):
         params = {
-            "n_estimators":      trial.suggest_int("n_estimators", 200, 1000),
-            "learning_rate":     trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-            "max_depth":         trial.suggest_int("max_depth", 3, 10),
-            "num_leaves":        trial.suggest_int("num_leaves", 20, 150),
+            "n_estimators": trial.suggest_int("n_estimators", 200, 1000),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+            "max_depth": trial.suggest_int("max_depth", 3, 10),
+            "num_leaves": trial.suggest_int("num_leaves", 20, 150),
             "min_child_samples": trial.suggest_int("min_child_samples", 10, 100),
-            "subsample":         trial.suggest_float("subsample", 0.6, 1.0),
-            "colsample_bytree":  trial.suggest_float("colsample_bytree", 0.6, 1.0),
-            "reg_alpha":         trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-            "reg_lambda":        trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
-            "scale_pos_weight":  scale_pos_weight,
-            "random_state":      42,
-            "verbose":           -1,
+            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
+            "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
+            "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+            "scale_pos_weight": scale_pos_weight,
+            "random_state": 42,
+            "verbose": -1,
         }
         m = LGBMClassifier(**params)
         m.fit(X_train, y_train, eval_set=[(X_val, y_val)])
@@ -130,6 +136,7 @@ def train_lightgbm(
 
 # -- Challenger: XGBoost with Optuna ------------------------------------------
 
+
 def train_xgboost(
     X_train: pd.DataFrame,
     y_train: np.ndarray,
@@ -144,17 +151,17 @@ def train_xgboost(
 
     def objective(trial):
         params = {
-            "n_estimators":      trial.suggest_int("n_estimators", 200, 1000),
-            "learning_rate":     trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-            "max_depth":         trial.suggest_int("max_depth", 3, 10),
-            "subsample":         trial.suggest_float("subsample", 0.6, 1.0),
-            "colsample_bytree":  trial.suggest_float("colsample_bytree", 0.6, 1.0),
-            "reg_alpha":         trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-            "reg_lambda":        trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
-            "scale_pos_weight":  scale_pos_weight,
-            "eval_metric":       "aucpr",
-            "random_state":      42,
-            "verbosity":         0,
+            "n_estimators": trial.suggest_int("n_estimators", 200, 1000),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+            "max_depth": trial.suggest_int("max_depth", 3, 10),
+            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
+            "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
+            "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+            "scale_pos_weight": scale_pos_weight,
+            "eval_metric": "aucpr",
+            "random_state": 42,
+            "verbosity": 0,
         }
         m = XGBClassifier(**params)
         m.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
@@ -165,8 +172,9 @@ def train_xgboost(
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
 
     best_params = study.best_params
-    best_params.update({"scale_pos_weight": scale_pos_weight,
-                        "random_state": 42, "verbosity": 0})
+    best_params.update(
+        {"scale_pos_weight": scale_pos_weight, "random_state": 42, "verbosity": 0}
+    )
 
     logger.info("Best XGBoost PR-AUC (val): %.4f", study.best_value)
 
@@ -177,6 +185,7 @@ def train_xgboost(
 
 
 # -- Champion Selection --------------------------------------------------------
+
 
 def select_champion(
     models: Dict[str, CalibratedClassifierCV],
@@ -189,7 +198,7 @@ def select_champion(
     Returns (champion_name, champion_model, all_metrics)
     """
     all_metrics = {}
-    best_name   = None
+    best_name = None
     best_pr_auc = -1.0
 
     for name, model in models.items():
@@ -198,7 +207,7 @@ def select_champion(
         all_metrics[name] = metrics
         if metrics["val_pr_auc"] > best_pr_auc:
             best_pr_auc = metrics["val_pr_auc"]
-            best_name   = name
+            best_name = name
 
     logger.info("Champion: %s (PR-AUC=%.4f)", best_name, best_pr_auc)
     return best_name, models[best_name], all_metrics

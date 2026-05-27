@@ -49,16 +49,16 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
         protected_cols: list = None,
         scale: bool = True,
     ):
-        self.drop_cols      = drop_cols or DROP_COLS
+        self.drop_cols = drop_cols or DROP_COLS
         self.protected_cols = protected_cols or PROTECTED_COLS
-        self.scale          = scale
+        self.scale = scale
 
         # Fitted state - populated during .fit()
-        self._feature_names: list        = []
-        self._cat_encodings: dict        = {}
-        self._numeric_medians: dict      = {}
+        self._feature_names: list = []
+        self._cat_encodings: dict = {}
+        self._numeric_medians: dict = {}
         self._scaler: Optional[StandardScaler] = None
-        self._fitted: bool               = False
+        self._fitted: bool = False
 
     # -- Fit ------------------------------------------------------------------─
 
@@ -153,7 +153,9 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
 
         for col in cat_cols:
             if fit:
-                mapping = {v: i for i, v in enumerate(sorted(df[col].dropna().unique()))}
+                mapping = {
+                    v: i for i, v in enumerate(sorted(df[col].dropna().unique()))
+                }
                 mapping["__unknown__"] = -1
                 self._cat_encodings[col] = mapping
             enc = self._cat_encodings.get(col, {})
@@ -171,8 +173,11 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
           - Add binary flag: has_ext_source_{n}
           - Fill missing with sentinel value -1 (not median)
         """
-        ext_sources = [c for c in ["EXT_SOURCE_1", "EXT_SOURCE_2", "EXT_SOURCE_3"]
-                       if c in df.columns]
+        ext_sources = [
+            c
+            for c in ["EXT_SOURCE_1", "EXT_SOURCE_2", "EXT_SOURCE_3"]
+            if c in df.columns
+        ]
         for col in ext_sources:
             df[f"has_{col.lower()}"] = df[col].notna().astype(int)
             df[col] = df[col].fillna(-1)

@@ -76,37 +76,40 @@ def disparate_impact_audit(
         if group_rates.empty:
             continue
 
-        max_rate  = group_rates["positive_rate"].max()
-        min_rate  = group_rates["positive_rate"].min()
+        max_rate = group_rates["positive_rate"].max()
+        min_rate = group_rates["positive_rate"].min()
         dir_value = (min_rate / max_rate) if max_rate > 0 else 1.0
         dpd_value = max_rate - min_rate
-        passed    = dir_value >= dir_threshold
+        passed = dir_value >= dir_threshold
 
         if not passed:
             all_passed = False
             logger.warning(
-                "FAIRNESS FAIL - %s: DIR=%.3f (threshold=%.2f). "
-                "Groups: %s",
-                col, dir_value, dir_threshold,
-                group_rates.set_index(col)["positive_rate"].to_dict()
+                "FAIRNESS FAIL - %s: DIR=%.3f (threshold=%.2f). " "Groups: %s",
+                col,
+                dir_value,
+                dir_threshold,
+                group_rates.set_index(col)["positive_rate"].to_dict(),
             )
         else:
             logger.info("Fairness PASS - %s: DIR=%.3f", col, dir_value)
 
         results[col] = {
-            "dir":          round(float(dir_value), 4),
-            "dpd":          round(float(dpd_value), 4),
-            "passed":       passed,
-            "max_rate":     round(float(max_rate), 4),
-            "min_rate":     round(float(min_rate), 4),
-            "group_rates":  group_rates.set_index(col)["positive_rate"].round(4).to_dict(),
+            "dir": round(float(dir_value), 4),
+            "dpd": round(float(dpd_value), 4),
+            "passed": passed,
+            "max_rate": round(float(max_rate), 4),
+            "min_rate": round(float(min_rate), 4),
+            "group_rates": group_rates.set_index(col)["positive_rate"]
+            .round(4)
+            .to_dict(),
         }
 
     return {
-        "all_passed":  all_passed,
-        "threshold":   dir_threshold,
+        "all_passed": all_passed,
+        "threshold": dir_threshold,
         "positive_label": positive_label,
-        "results":     results,
+        "results": results,
     }
 
 
@@ -127,7 +130,8 @@ def fairness_gate(audit_result: dict, strict: bool = True) -> bool:
 
     if not passed:
         failing = [
-            col for col, res in audit_result.get("results", {}).items()
+            col
+            for col, res in audit_result.get("results", {}).items()
             if not res.get("passed", True)
         ]
         msg = (
@@ -155,13 +159,15 @@ def monthly_fairness_report(
     audit = disparate_impact_audit(scored_df, audit_cols=audit_cols)
     rows = []
     for col, res in audit["results"].items():
-        rows.append({
-            "month":      month_label,
-            "feature":    col,
-            "dir":        res["dir"],
-            "dpd":        res["dpd"],
-            "passed":     res["passed"],
-            "max_rate":   res["max_rate"],
-            "min_rate":   res["min_rate"],
-        })
+        rows.append(
+            {
+                "month": month_label,
+                "feature": col,
+                "dir": res["dir"],
+                "dpd": res["dpd"],
+                "passed": res["passed"],
+                "max_rate": res["max_rate"],
+                "min_rate": res["min_rate"],
+            }
+        )
     return pd.DataFrame(rows)

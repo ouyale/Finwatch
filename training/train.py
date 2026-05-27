@@ -30,8 +30,13 @@ from sklearn.model_selection import train_test_split
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from finwatch.constants import (
-    ARTEFACT_MODEL, ARTEFACT_PREPROCESSOR, ARTEFACT_SHAP_EXPLAINER,
-    ARTEFACT_THRESHOLDS, FAIRNESS_AUDIT_COLS, MLFLOW_EXPERIMENT, TARGET,
+    ARTEFACT_MODEL,
+    ARTEFACT_PREPROCESSOR,
+    ARTEFACT_SHAP_EXPLAINER,
+    ARTEFACT_THRESHOLDS,
+    FAIRNESS_AUDIT_COLS,
+    MLFLOW_EXPERIMENT,
+    TARGET,
 )
 from finwatch.decision_engine import InterventionEngine
 from finwatch.explainability import get_explainer
@@ -39,8 +44,11 @@ from finwatch.fairness import disparate_impact_audit, fairness_gate
 from finwatch.features import run_all
 from finwatch.macro_data import get_macro_snapshot, save_macro_baseline
 from finwatch.models import (
-    evaluate_model, select_champion,
-    train_lightgbm, train_logistic_regression, train_xgboost,
+    evaluate_model,
+    select_champion,
+    train_lightgbm,
+    train_logistic_regression,
+    train_xgboost,
 )
 from finwatch.preprocessor import CustomerPreprocessor
 
@@ -77,21 +85,23 @@ def main(args):
     X_train, X_val, y_train, y_val = train_test_split(
         X_temp, y_temp, test_size=0.25, stratify=y_temp, random_state=42
     )
-    logger.info("Split: train=%d  val=%d  test=%d", len(X_train), len(X_val), len(X_test))
+    logger.info(
+        "Split: train=%d  val=%d  test=%d", len(X_train), len(X_val), len(X_test)
+    )
 
     # -- 3. Preprocess --------------------------------------------------------─
     preprocessor = CustomerPreprocessor()
     X_train_clean = preprocessor.fit_transform(X_train, y_train)
-    X_val_clean   = preprocessor.transform(X_val)
-    X_test_clean  = preprocessor.transform(X_test)
+    X_val_clean = preprocessor.transform(X_val)
+    X_test_clean = preprocessor.transform(X_test)
 
     # -- 4. Feature engineering ------------------------------------------------
     logger.info("Fetching ONS macro snapshot...")
     macro_snapshot = get_macro_snapshot()
 
     X_train_feat = run_all(X_train_clean, macro_snapshot)
-    X_val_feat   = run_all(X_val_clean,   macro_snapshot)
-    X_test_feat  = run_all(X_test_clean,  macro_snapshot)
+    X_val_feat = run_all(X_val_clean, macro_snapshot)
+    X_test_feat = run_all(X_test_clean, macro_snapshot)
 
     # -- 5. SMOTE - training fold ONLY ----------------------------------------
     logger.info("Applying SMOTE to training fold only...")
@@ -99,30 +109,35 @@ def main(args):
     X_train_bal, y_train_bal = smote.fit_resample(X_train_feat, y_train)
     logger.info(
         "After SMOTE: %d rows (was %d). Class balance: %.1f%%",
-        len(X_train_bal), len(X_train_feat),
-        100 * y_train_bal.mean()
+        len(X_train_bal),
+        len(X_train_feat),
+        100 * y_train_bal.mean(),
     )
 
     # -- 6. Train models ------------------------------------------------------─
     mlflow.set_experiment(args.experiment)
 
     with mlflow.start_run(run_name=f"finwatch-training"):
-        mlflow.log_params({
-            "n_train": len(X_train_bal),
-            "n_val":   len(X_val_feat),
-            "n_test":  len(X_test_feat),
-            "n_features": X_train_feat.shape[1],
-            "optuna_trials": args.n_trials,
-        })
+        mlflow.log_params(
+            {
+                "n_train": len(X_train_bal),
+                "n_val": len(X_val_feat),
+                "n_test": len(X_test_feat),
+                "n_features": X_train_feat.shape[1],
+                "optuna_trials": args.n_trials,
+            }
+        )
 
         n_trials = 5 if args.skip_optuna else args.n_trials
 
         models = {
             "logistic_regression": train_logistic_regression(X_train_bal, y_train_bal),
-            "lightgbm":            train_lightgbm(X_train_bal, y_train_bal,
-                                                  X_val_feat, y_val, n_trials=n_trials),
-            "xgboost":             train_xgboost(X_train_bal, y_train_bal,
-                                                 X_val_feat, y_val, n_trials=n_trials),
+            "lightgbm": train_lightgbm(
+                X_train_bal, y_train_bal, X_val_feat, y_val, n_trials=n_trials
+            ),
+            "xgboost": train_xgboost(
+                X_train_bal, y_train_bal, X_val_feat, y_val, n_trials=n_trials
+            ),
         }
 
         # -- 7. Select champion ------------------------------------------------
@@ -154,9 +169,9 @@ def main(args):
         val_indices = X_val.index
         fairness_val = fairness_df.loc[fairness_df.index.isin(val_indices)].copy()
         fairness_val["tier"] = engine.predict_batch(
-            pd.DataFrame({
-                "vulnerability_score": champion_model.predict_proba(X_val_feat)[:, 1]
-            })
+            pd.DataFrame(
+                {"vulnerability_score": champion_model.predict_proba(X_val_feat)[:, 1]}
+            )
         )["tier"].values
 
         audit_result = disparate_impact_audit(fairness_val)
@@ -172,12 +187,14 @@ def main(args):
         # -- 11. Save artefacts ------------------------------------------------
         Path("data/processed").mkdir(parents=True, exist_ok=True)
 
-        joblib.dump(preprocessor,     f"data/processed/{ARTEFACT_PREPROCESSOR}")
-        joblib.dump(champion_model,   f"data/processed/{ARTEFACT_MODEL}")
+        joblib.dump(preprocessor, f"data/processed/{ARTEFACT_PREPROCESSOR}")
+        joblib.dump(champion_model, f"data/processed/{ARTEFACT_MODEL}")
         engine.save_thresholds(f"data/processed/{ARTEFACT_THRESHOLDS}")
 
         # SHAP explainer
-        explainer = get_explainer(champion_model, X_train_feat.sample(500, random_state=42))
+        explainer = get_explainer(
+            champion_model, X_train_feat.sample(500, random_state=42)
+        )
         joblib.dump(explainer, f"data/processed/{ARTEFACT_SHAP_EXPLAINER}")
 
         # Save macro baseline for drift monitoring
@@ -185,20 +202,28 @@ def main(args):
 
         # Log artefacts to MLflow
         mlflow.log_artifacts("data/processed", artifact_path="model")
-        mlflow.sklearn.log_model(champion_model, "champion_model",
-                                 registered_model_name="finwatch-champion")
+        mlflow.sklearn.log_model(
+            champion_model, "champion_model", registered_model_name="finwatch-champion"
+        )
 
         logger.info("Training complete. Run ID: %s", mlflow.active_run().info.run_id)
-        logger.info("Champion: %s | Test PR-AUC: %.4f | Test ROC-AUC: %.4f",
-                    champion_name, test_metrics["test_pr_auc"], test_metrics["test_roc_auc"])
+        logger.info(
+            "Champion: %s | Test PR-AUC: %.4f | Test ROC-AUC: %.4f",
+            champion_name,
+            test_metrics["test_pr_auc"],
+            test_metrics["test_roc_auc"],
+        )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train the FinWatch vulnerability model")
-    parser.add_argument("--data-path",   default="data/raw/application_train.csv")
-    parser.add_argument("--experiment",  default=MLFLOW_EXPERIMENT)
-    parser.add_argument("--n-trials",    type=int, default=50)
-    parser.add_argument("--skip-optuna", action="store_true",
-                        help="Use n_trials=5 for fast testing")
+    parser = argparse.ArgumentParser(
+        description="Train the FinWatch vulnerability model"
+    )
+    parser.add_argument("--data-path", default="data/raw/application_train.csv")
+    parser.add_argument("--experiment", default=MLFLOW_EXPERIMENT)
+    parser.add_argument("--n-trials", type=int, default=50)
+    parser.add_argument(
+        "--skip-optuna", action="store_true", help="Use n_trials=5 for fast testing"
+    )
     args = parser.parse_args()
     main(args)

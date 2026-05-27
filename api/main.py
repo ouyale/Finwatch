@@ -24,10 +24,18 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 
 from api.schemas import (
-    BatchRequest, BatchResponse, CustomerRecord,
-    HealthResponse, ScoreResponse, SHAPFeature,
+    BatchRequest,
+    BatchResponse,
+    CustomerRecord,
+    HealthResponse,
+    ScoreResponse,
+    SHAPFeature,
 )
-from finwatch.constants import ARTEFACT_MODEL, ARTEFACT_PREPROCESSOR, ARTEFACT_SHAP_EXPLAINER
+from finwatch.constants import (
+    ARTEFACT_MODEL,
+    ARTEFACT_PREPROCESSOR,
+    ARTEFACT_SHAP_EXPLAINER,
+)
 from finwatch.decision_engine import InterventionEngine
 from finwatch.explainability import explain_single
 from finwatch.features import run_all
@@ -46,16 +54,18 @@ async def lifespan(app: FastAPI):
     logger.info("Loading model artefacts from %s...", artefact_dir)
 
     _state["preprocessor"] = joblib.load(artefact_dir / ARTEFACT_PREPROCESSOR)
-    _state["model"]        = joblib.load(artefact_dir / ARTEFACT_MODEL)
-    _state["explainer"]    = joblib.load(artefact_dir / ARTEFACT_SHAP_EXPLAINER)
-    _state["engine"]       = InterventionEngine.load_thresholds(
-                                str(artefact_dir / "thresholds.json")
-                             )
+    _state["model"] = joblib.load(artefact_dir / ARTEFACT_MODEL)
+    _state["explainer"] = joblib.load(artefact_dir / ARTEFACT_SHAP_EXPLAINER)
+    _state["engine"] = InterventionEngine.load_thresholds(
+        str(artefact_dir / "thresholds.json")
+    )
     _state["model_version"] = "0.1.0"  # TODO: read from MLflow registry
 
-    logger.info("Model loaded. Thresholds: ESCALATE=%.2f, OUTREACH=%.2f",
-                _state["engine"].threshold_escalate,
-                _state["engine"].threshold_outreach)
+    logger.info(
+        "Model loaded. Thresholds: ESCALATE=%.2f, OUTREACH=%.2f",
+        _state["engine"].threshold_escalate,
+        _state["engine"].threshold_outreach,
+    )
     yield
     _state.clear()
 
@@ -74,6 +84,7 @@ app = FastAPI(
 
 
 # -- Endpoints ------------------------------------------------------------------
+
 
 @app.get("/health", response_model=HealthResponse, tags=["Operations"])
 async def health():
@@ -99,13 +110,14 @@ async def score_single(record: CustomerRecord):
 
         # Preprocess → feature engineer → score
         X_clean = _state["preprocessor"].transform(df)
-        X_feat  = run_all(X_clean, macro_snapshot)
+        X_feat = run_all(X_clean, macro_snapshot)
 
         probability = float(_state["model"].predict_proba(X_feat)[:, 1][0])
 
         # SHAP explanation
         shap_features = explain_single(
-            _state["explainer"], X_feat,
+            _state["explainer"],
+            X_feat,
             _state["preprocessor"].feature_names,
             n_features=5,
         )
@@ -149,11 +161,12 @@ async def score_batch(request: BatchRequest):
         for record in request.customers:
             df = pd.DataFrame([record.model_dump()])
             X_clean = _state["preprocessor"].transform(df)
-            X_feat  = run_all(X_clean, macro_snapshot)
+            X_feat = run_all(X_clean, macro_snapshot)
             probability = float(_state["model"].predict_proba(X_feat)[:, 1][0])
 
             shap_features = explain_single(
-                _state["explainer"], X_feat,
+                _state["explainer"],
+                X_feat,
                 _state["preprocessor"].feature_names,
             )
             decision = _state["engine"].predict_single(
@@ -162,17 +175,19 @@ async def score_batch(request: BatchRequest):
                 shap_features=shap_features,
                 model_version=_state["model_version"],
             )
-            results.append(ScoreResponse(
-                customer_id=record.SK_ID_CURR,
-                vulnerability_score=decision.vulnerability_score,
-                tier=decision.tier,
-                threshold_escalate=decision.threshold_escalate,
-                threshold_outreach=decision.threshold_outreach,
-                top_shap_features=[SHAPFeature(**f) for f in shap_features],
-                model_version=decision.model_version,
-                scored_at=decision.scored_at,
-                macro_snapshot=macro_snapshot,
-            ))
+            results.append(
+                ScoreResponse(
+                    customer_id=record.SK_ID_CURR,
+                    vulnerability_score=decision.vulnerability_score,
+                    tier=decision.tier,
+                    threshold_escalate=decision.threshold_escalate,
+                    threshold_outreach=decision.threshold_outreach,
+                    top_shap_features=[SHAPFeature(**f) for f in shap_features],
+                    model_version=decision.model_version,
+                    scored_at=decision.scored_at,
+                    macro_snapshot=macro_snapshot,
+                )
+            )
 
         tiers = [r.tier for r in results]
         return BatchResponse(

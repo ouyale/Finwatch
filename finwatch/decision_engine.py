@@ -42,25 +42,26 @@ TIERS = ["MONITOR", "OUTREACH", "ESCALATE"]
 @dataclass
 class InterventionDecision:
     """The full output of a single vulnerability scoring event."""
+
     customer_id: str
-    vulnerability_score: float          # Calibrated P(vulnerable)
-    tier: str                           # MONITOR / OUTREACH / ESCALATE
+    vulnerability_score: float  # Calibrated P(vulnerable)
+    tier: str  # MONITOR / OUTREACH / ESCALATE
     threshold_escalate: float
     threshold_outreach: float
-    top_shap_features: list = field(default_factory=list)   # From explainability module
+    top_shap_features: list = field(default_factory=list)  # From explainability module
     model_version: str = "unknown"
     scored_at: str = ""
 
     def to_dict(self) -> dict:
         return {
-            "customer_id":       self.customer_id,
+            "customer_id": self.customer_id,
             "vulnerability_score": round(self.vulnerability_score, 4),
-            "tier":              self.tier,
+            "tier": self.tier,
             "threshold_escalate": self.threshold_escalate,
             "threshold_outreach": self.threshold_outreach,
             "top_shap_features": self.top_shap_features,
-            "model_version":     self.model_version,
-            "scored_at":         self.scored_at,
+            "model_version": self.model_version,
+            "scored_at": self.scored_at,
         }
 
 
@@ -116,7 +117,7 @@ class InterventionEngine:
         dict with optimal thresholds and the cost at each
         """
         thresholds = np.linspace(0.1, 0.9, grid_steps)
-        best_cost  = np.inf
+        best_cost = np.inf
         best_thresh = self.threshold_escalate
 
         for t in thresholds:
@@ -125,7 +126,7 @@ class InterventionEngine:
             fp = ((preds == 1) & (y_val == 0)).sum()
             cost = fn_cost * fn + fp_cost * fp
             if cost < best_cost:
-                best_cost  = cost
+                best_cost = cost
                 best_thresh = t
 
         self.threshold_escalate = round(float(best_thresh), 4)
@@ -133,7 +134,9 @@ class InterventionEngine:
 
         logger.info(
             "Calibrated thresholds - ESCALATE: %.4f, OUTREACH: %.4f (cost: %.0f)",
-            self.threshold_escalate, self.threshold_outreach, best_cost
+            self.threshold_escalate,
+            self.threshold_outreach,
+            best_cost,
         )
         return {
             "threshold_escalate": self.threshold_escalate,
@@ -160,6 +163,7 @@ class InterventionEngine:
     ) -> InterventionDecision:
         """Score a single customer and return a full InterventionDecision."""
         from datetime import datetime, timezone
+
         return InterventionDecision(
             customer_id=customer_id,
             vulnerability_score=probability,
@@ -209,18 +213,26 @@ class InterventionEngine:
         """Save calibrated thresholds to disk for API loading."""
         import json
         from pathlib import Path
+
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
-            json.dump({
-                "threshold_escalate": self.threshold_escalate,
-                "threshold_outreach": self.threshold_outreach,
-            }, f, indent=2)
+            json.dump(
+                {
+                    "threshold_escalate": self.threshold_escalate,
+                    "threshold_outreach": self.threshold_outreach,
+                },
+                f,
+                indent=2,
+            )
         logger.info("Thresholds saved to %s", path)
 
     @classmethod
-    def load_thresholds(cls, path: str = "data/external/thresholds.json") -> "InterventionEngine":
+    def load_thresholds(
+        cls, path: str = "data/external/thresholds.json"
+    ) -> "InterventionEngine":
         """Load a previously calibrated InterventionEngine from disk."""
         import json
+
         with open(path) as f:
             t = json.load(f)
         return cls(

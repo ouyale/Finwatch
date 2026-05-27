@@ -11,4 +11,4 @@ with FCA Consumer Duty requirements.
 """
 
 __version__ = "0.1.0"
-__author__  = "Barbara Werobaobayi"
+__author__ = "Barbara Werobaobayi"

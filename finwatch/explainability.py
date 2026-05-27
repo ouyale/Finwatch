@@ -82,7 +82,7 @@ def top_shap_features(
 
     return [
         {
-            "feature":   feature_names[i],
+            "feature": feature_names[i],
             "shap_value": round(float(values[i]), 4),
             "direction": "increases_risk" if values[i] > 0 else "reduces_risk",
         }

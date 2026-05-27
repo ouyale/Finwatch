@@ -7,9 +7,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Coverage: 70%+](https://img.shields.io/badge/coverage-70%25+-brightgreen)](tests/)
 
-Traditional credit models answer one question: will this new applicant default? I built FinWatch to answer a different one -- which of our **existing** customers is silently struggling right now, and what should we do about it?
+Traditional credit models answer one question: will this new applicant default? I built FinWatch to answer a different one - which of our **existing** customers is silently struggling right now, and what should we do about it?
 
-This matters because the **FCA Consumer Duty (July 2023)** creates a legal obligation for banks to proactively identify customers in vulnerable circumstances -- not wait for them to miss a payment. FinWatch is a full production ML system that continuously scores existing customers for financial vulnerability and routes them to tiered interventions before they reach crisis point.
+This matters because the **FCA Consumer Duty (July 2023)** creates a legal obligation for banks to proactively identify customers in vulnerable circumstances - not wait for them to miss a payment. FinWatch is a full production ML system that continuously scores existing customers for financial vulnerability and routes them to tiered interventions before they reach crisis point.
 
 ---
 
@@ -36,7 +36,7 @@ This matters because the **FCA Consumer Duty (July 2023)** creates a legal oblig
 
 ## The Problem
 
-Credit risk modelling has a blind spot. It focuses entirely on the application stage -- once a loan is approved, most banks know very little about how a customer's financial position evolves over time. By the time distress signals appear in payment data, it is often too late to intervene meaningfully.
+Credit risk modelling has a blind spot. It focuses entirely on the application stage - once a loan is approved, most banks know very little about how a customer's financial position evolves over time. By the time distress signals appear in payment data, it is often too late to intervene meaningfully.
 
 A few things make this problem genuinely hard:
 
@@ -100,7 +100,7 @@ On top of the Home Credit features, I append five live macroeconomic indicators 
 | Household energy expenditure | A major fixed cost that squeezes budgets during energy shocks |
 | GfK consumer confidence | Forward-looking sentiment indicator |
 
-These are appended as constant columns to every row -- every customer is scored against the same current macroeconomic environment. The baseline values at training time are saved, and drift detection flags if any indicator moves more than 1.5 standard deviations from that baseline.
+These are appended as constant columns to every row - every customer is scored against the same current macroeconomic environment. The baseline values at training time are saved, and drift detection flags if any indicator moves more than 1.5 standard deviations from that baseline.
 
 ---
 
@@ -108,7 +108,7 @@ These are appended as constant columns to every row -- every customer is scored 
 
 Before writing a single line of preprocessing or modelling code, I ran a full EDA in `notebooks/01_EDA.ipynb`. The findings that shaped the rest of the project:
 
-**Target distribution.** 8.07% positive rate confirms severe class imbalance. ROC-AUC will be misleading here -- I chose PR-AUC as the primary evaluation metric.
+**Target distribution.** 8.07% positive rate confirms severe class imbalance. ROC-AUC will be misleading here - I chose PR-AUC as the primary evaluation metric.
 
 **Missing values.** `EXT_SOURCE_2` is 8% missing, `AMT_GOODS_PRICE` is 0.3% missing. Rates are low enough that median/mode imputation is appropriate.
 
@@ -122,18 +122,18 @@ Before writing a single line of preprocessing or modelling code, I ran a full ED
 
 ## Preprocessing
 
-The `CustomerPreprocessor` class in `finwatch/preprocessor.py` handles all data cleaning. I implemented it as a fitted transformer -- it learns statistics from training data during `.fit()`, saves them, and applies those exact saved values at scoring time via `.transform()`.
+The `CustomerPreprocessor` class in `finwatch/preprocessor.py` handles all data cleaning. I implemented it as a fitted transformer - it learns statistics from training data during `.fit()`, saves them, and applies those exact saved values at scoring time via `.transform()`.
 
 This distinction matters. A script that recalculates statistics from inference-time data would behave differently at test time than at training time, making reported metrics unreliable and production behaviour unpredictable.
 
 Steps in order:
 
-1. **Missing value imputation** -- numeric columns filled with training median, categoricals with training mode
-2. **Categorical encoding** -- binary categoricals label-encoded, multi-value categoricals one-hot encoded
-3. **Numeric scaling** -- StandardScaler fitted on training set only
-4. **Macro feature append** -- five ONS indicators appended after all other transformations
+1. **Missing value imputation** - numeric columns filled with training median, categoricals with training mode
+2. **Categorical encoding** - binary categoricals label-encoded, multi-value categoricals one-hot encoded
+3. **Numeric scaling** - StandardScaler fitted on training set only
+4. **Macro feature append** - five ONS indicators appended after all other transformations
 
-The fitted preprocessor is serialised to `data/processed/preprocessor.pkl` after training and loaded at API startup. The model and preprocessor always move together -- they must be version-matched.
+The fitted preprocessor is serialised to `data/processed/preprocessor.pkl` after training and loaded at API startup. The model and preprocessor always move together - they must be version-matched.
 
 ---
 
@@ -142,16 +142,16 @@ The fitted preprocessor is serialised to `data/processed/preprocessor.pkl` after
 Raw columns often carry less signal than their relationships with each other. `finwatch/features.py` creates three categories of derived features:
 
 **Financial stress ratios:**
-- `credit_to_income_ratio` -- how many years of gross salary is the debt?
-- `annuity_to_income_ratio` -- what fraction of income goes to loan repayments?
-- `goods_to_credit_ratio` -- how much of the credit was for goods vs administrative costs?
+- `credit_to_income_ratio` - how many years of gross salary is the debt?
+- `annuity_to_income_ratio` - what fraction of income goes to loan repayments?
+- `goods_to_credit_ratio` - how much of the credit was for goods vs administrative costs?
 
 **Employment stability:**
-- `days_employed_pct_of_age` -- what proportion of your life have you been employed? A 50-year-old with 2 years of employment tells a different story than a 25-year-old in the same position. Raw DAYS_EMPLOYED cannot capture this.
+- `days_employed_pct_of_age` - what proportion of your life have you been employed? A 50-year-old with 2 years of employment tells a different story than a 25-year-old in the same position. Raw DAYS_EMPLOYED cannot capture this.
 
 **Binary flags:**
-- `is_high_credit_to_income` -- threshold flag at credit/income > 5
-- `is_young_borrower` -- age under 30
+- `is_high_credit_to_income` - threshold flag at credit/income > 5
+- `is_young_borrower` - age under 30
 
 I kept the feature set focused rather than exhaustive. On a regulated system, every feature needs to be justifiable to a compliance team.
 
@@ -161,7 +161,7 @@ I kept the feature set focused rather than exhaustive. On a regulated system, ev
 
 ### Why gradient boosting over deep learning
 
-Deep learning was not in contention. The literature is clear that on tabular datasets without spatial or sequential structure, gradient boosting consistently outperforms neural networks (Grinsztajn et al., 2022). The Home Credit dataset sits comfortably within the regime where gradient boosting dominates. It also trains much faster and produces SHAP explanations natively -- non-negotiable for a regulated deployment.
+Deep learning was not in contention. The literature is clear that on tabular datasets without spatial or sequential structure, gradient boosting consistently outperforms neural networks (Grinsztajn et al., 2022). The Home Credit dataset sits comfortably within the regime where gradient boosting dominates. It also trains much faster and produces SHAP explanations natively - non-negotiable for a regulated deployment.
 
 ### Handling class imbalance
 
@@ -171,11 +171,11 @@ I used SMOTE (Synthetic Minority Over-sampling Technique) rather than class weig
 
 ### Hyperparameter optimisation
 
-I used Optuna with TPE (Tree-structured Parzen Estimator) Bayesian optimisation for 50 trials on both LightGBM and XGBoost. TPE builds a probabilistic model of which hyperparameter regions produce good results and focuses search there -- far more efficient than random or grid search.
+I used Optuna with TPE (Tree-structured Parzen Estimator) Bayesian optimisation for 50 trials on both LightGBM and XGBoost. TPE builds a probabilistic model of which hyperparameter regions produce good results and focuses search there - far more efficient than random or grid search.
 
 ### Champion selection
 
-All three candidates are compared on PR-AUC on the validation set. I chose PR-AUC over ROC-AUC because ROC-AUC is inflated by the majority class. A model that labels everyone as fine will still achieve a high ROC-AUC. PR-AUC cannot be fooled this way -- it focuses entirely on how well the model identifies the vulnerable minority.
+All three candidates are compared on PR-AUC on the validation set. I chose PR-AUC over ROC-AUC because ROC-AUC is inflated by the majority class. A model that labels everyone as fine will still achieve a high ROC-AUC. PR-AUC cannot be fooled this way - it focuses entirely on how well the model identifies the vulnerable minority.
 
 ### Probability calibration and threshold optimisation
 
@@ -191,7 +191,7 @@ The 5:1 asymmetry reflects the regulatory reality: missing a vulnerable customer
 
 ## Fairness and Compliance
 
-Before any model is registered to MLflow, it must pass the **FCA 4/5ths disparate impact test**. This is a hard gate -- a failing model raises a `ValueError` and is never deployed.
+Before any model is registered to MLflow, it must pass the **FCA 4/5ths disparate impact test**. This is a hard gate - a failing model raises a `ValueError` and is never deployed.
 
 The Disparate Impact Ratio (DIR) is computed for gender, family status, and education type:
 
@@ -201,7 +201,7 @@ DIR = (ESCALATE rate of disadvantaged group) / (ESCALATE rate of most-advantaged
 
 Threshold: DIR >= 0.80. Monthly fairness audit results are logged to `data/processed/fairness_log.parquet`.
 
-This system also satisfies **UK GDPR Article 22** via SHAP values -- every individual scoring decision is accompanied by the top contributing features and their direction of influence.
+This system also satisfies **UK GDPR Article 22** via SHAP values - every individual scoring decision is accompanied by the top contributing features and their direction of influence.
 
 ---
 
@@ -209,9 +209,9 @@ This system also satisfies **UK GDPR Article 22** via SHAP values -- every indiv
 
 | Score | Tier | Action |
 |-------|------|--------|
-| >= 0.70 | ESCALATE | Immediate outreach -- assign to specialist vulnerability team |
-| 0.40 - 0.70 | OUTREACH | Proactive contact -- offer support products, payment holidays |
-| < 0.40 | MONITOR | No action required -- continue standard monitoring |
+| >= 0.70 | ESCALATE | Immediate outreach - assign to specialist vulnerability team |
+| 0.40 - 0.70 | OUTREACH | Proactive contact - offer support products, payment holidays |
+| < 0.40 | MONITOR | No action required - continue standard monitoring |
 
 Thresholds are calibrated per model run, not hardcoded.
 
@@ -221,9 +221,9 @@ Thresholds are calibrated per model run, not hardcoded.
 
 The model is served via FastAPI in `api/main.py`. Three endpoints:
 
-- `POST /score/single` -- score one customer, returns tier, score, and top SHAP features
-- `POST /score/batch` -- score a list of customers
-- `GET /health` -- API status and current model version
+- `POST /score/single` - score one customer, returns tier, score, and top SHAP features
+- `POST /score/batch` - score a list of customers
+- `GET /health` - API status and current model version
 
 Request validation is handled by Pydantic v2 schemas. Invalid inputs are rejected before reaching the model. Swagger docs auto-generated at `/docs`.
 
@@ -240,9 +240,9 @@ Request validation is handled by Pydantic v2 schemas. Invalid inputs are rejecte
 | > 0.20 | Significant shift | Review / retrain |
 
 Three retraining triggers:
-1. **Scheduled** -- monthly baseline retrain
-2. **Feature drift** -- PSI > 0.20 on any key feature
-3. **Macro drift** -- any ONS indicator moves more than 1.5 standard deviations from training baseline
+1. **Scheduled** - monthly baseline retrain
+2. **Feature drift** - PSI > 0.20 on any key feature
+3. **Macro drift** - any ONS indicator moves more than 1.5 standard deviations from training baseline
 
 ---
 
@@ -250,10 +250,10 @@ Three retraining triggers:
 
 The Streamlit dashboard in `dashboard/app.py` has four pages:
 
-- **Portfolio Overview** -- KPI cards, tier donut chart, score distribution histogram
-- **Score a Customer** -- live API call with SHAP explanation chart
-- **Drift Monitor** -- PSI values per feature with threshold reference lines
-- **Fairness Audit** -- DIR trend over time, audit log
+- **Portfolio Overview** - KPI cards, tier donut chart, score distribution histogram
+- **Score a Customer** - live API call with SHAP explanation chart
+- **Drift Monitor** - PSI values per feature with threshold reference lines
+- **Fairness Audit** - DIR trend over time, audit log
 
 Includes demo mode with synthetic data when no model artefacts exist yet.
 
@@ -340,7 +340,7 @@ docker-compose up --build
 
 | Regulation | Relevance |
 |-----------|-----------|
-| FCA Consumer Duty (2023) | Proactive identification of vulnerable customers -- primary mandate |
+| FCA Consumer Duty (2023) | Proactive identification of vulnerable customers - primary mandate |
 | FCA PS21/11 | Fair treatment of vulnerable customers |
 | UK GDPR Article 22 | Right to explanation for automated decisions |
 | PRA SS1/23 | Model validation, monitoring, and challenger processes |

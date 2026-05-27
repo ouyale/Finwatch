@@ -44,11 +44,13 @@ def compute_psi(
     breakpoints = np.unique(breakpoints)  # remove duplicates at edges
 
     expected_counts = np.histogram(expected, bins=breakpoints)[0]
-    actual_counts   = np.histogram(actual,   bins=breakpoints)[0]
+    actual_counts = np.histogram(actual, bins=breakpoints)[0]
 
     # Convert to proportions, avoiding division by zero
-    expected_pct = np.where(expected_counts == 0, 0.0001, expected_counts / len(expected))
-    actual_pct   = np.where(actual_counts   == 0, 0.0001, actual_counts   / len(actual))
+    expected_pct = np.where(
+        expected_counts == 0, 0.0001, expected_counts / len(expected)
+    )
+    actual_pct = np.where(actual_counts == 0, 0.0001, actual_counts / len(actual))
 
     psi = np.sum((actual_pct - expected_pct) * np.log(actual_pct / expected_pct))
     return round(float(psi), 4)
@@ -65,9 +67,11 @@ def run_psi_report(
     Returns a DataFrame with one row per feature:
       feature | psi | status | action
     """
-    features = features or [c for c in baseline_df.columns
-                            if c in current_df.columns
-                            and pd.api.types.is_numeric_dtype(baseline_df[c])]
+    features = features or [
+        c
+        for c in baseline_df.columns
+        if c in current_df.columns and pd.api.types.is_numeric_dtype(baseline_df[c])
+    ]
 
     rows = []
     for feature in features:
@@ -79,18 +83,20 @@ def run_psi_report(
         if psi >= PSI_RETRAIN:
             status, action = "CRITICAL", "Retrain immediately"
         elif psi >= PSI_ALERT:
-            status, action = "ALERT",    "Schedule retraining"
+            status, action = "ALERT", "Schedule retraining"
         elif psi >= PSI_WARN:
-            status, action = "WARN",     "Monitor closely"
+            status, action = "WARN", "Monitor closely"
         else:
-            status, action = "OK",       "No action needed"
+            status, action = "OK", "No action needed"
 
-        rows.append({
-            "feature": feature,
-            "psi":     psi,
-            "status":  status,
-            "action":  action,
-        })
+        rows.append(
+            {
+                "feature": feature,
+                "psi": psi,
+                "status": status,
+                "action": action,
+            }
+        )
 
         if status in ("CRITICAL", "ALERT"):
             logger.warning("PSI %s - %s: %.4f", status, feature, psi)

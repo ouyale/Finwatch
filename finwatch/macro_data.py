@@ -60,7 +60,9 @@ def get_macro_snapshot(use_cache: bool = True) -> dict:
             snapshot[feature_name] = value
             logger.info("ONS %s (%s) = %.3f", feature_name, series_id, value)
         except Exception as e:
-            logger.warning("Failed to fetch ONS series %s: %s - using None", series_id, e)
+            logger.warning(
+                "Failed to fetch ONS series %s: %s - using None", series_id, e
+            )
             snapshot[feature_name] = None
 
     _write_cache(snapshot)
@@ -88,7 +90,9 @@ def _fetch_series_latest(series_id: str) -> float:
     return float(latest["value"])
 
 
-def save_macro_baseline(snapshot: dict, path: str = "data/external/macro_baseline.json"):
+def save_macro_baseline(
+    snapshot: dict, path: str = "data/external/macro_baseline.json"
+):
     """
     Save current macro snapshot as the training-time baseline.
 
@@ -128,14 +132,16 @@ def check_macro_drift(
     sigma_threshold   : number of standard deviations to trigger alert
     """
     if not Path(baseline_path).exists():
-        logger.warning("No macro baseline found at %s - skipping drift check.", baseline_path)
+        logger.warning(
+            "No macro baseline found at %s - skipping drift check.", baseline_path
+        )
         return {"should_retrain": False, "drifted_features": [], "max_drift_sigma": 0.0}
 
     with open(baseline_path) as f:
         baseline = json.load(f)
 
     baseline_values = baseline.get("values", {})
-    baseline_stds   = baseline.get("stds", {})
+    baseline_stds = baseline.get("stds", {})
 
     details = {}
     drifted = []
@@ -161,7 +167,10 @@ def check_macro_drift(
             drifted.append(feature)
             logger.warning(
                 "Macro drift detected: %s shifted %.2fσ (baseline=%.3f, current=%.3f)",
-                feature, drift_sigma, base_val, current_value
+                feature,
+                drift_sigma,
+                base_val,
+                current_value,
             )
 
     max_drift = max((d["drift_sigma"] for d in details.values()), default=0.0)
@@ -176,6 +185,7 @@ def check_macro_drift(
 
 
 # -- Cache helpers ------------------------------------------------------------─
+
 
 def _cache_is_fresh() -> bool:
     if not _CACHE_FILE.exists():
@@ -193,4 +203,6 @@ def _read_cache() -> dict:
 def _write_cache(values: dict):
     _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(_CACHE_FILE, "w") as f:
-        json.dump({"fetched_at": datetime.utcnow().isoformat(), "values": values}, f, indent=2)
+        json.dump(
+            {"fetched_at": datetime.utcnow().isoformat(), "values": values}, f, indent=2
+        )
