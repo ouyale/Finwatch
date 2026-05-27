@@ -13,7 +13,6 @@ Usage
 """
 
 import argparse
-import json
 import logging
 import sys
 from pathlib import Path
@@ -21,15 +20,14 @@ from pathlib import Path
 import joblib
 import mlflow
 import mlflow.sklearn
-import numpy as np
 import pandas as pd
 from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split
 
-# Add project root to path
+# Add project root to path so finwatch package is importable when run directly
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from finwatch.constants import (
+from finwatch.constants import (  # noqa: E402
     ARTEFACT_MODEL,
     ARTEFACT_PREPROCESSOR,
     ARTEFACT_SHAP_EXPLAINER,
@@ -38,19 +36,19 @@ from finwatch.constants import (
     MLFLOW_EXPERIMENT,
     TARGET,
 )
-from finwatch.decision_engine import InterventionEngine
-from finwatch.explainability import get_explainer
-from finwatch.fairness import disparate_impact_audit, fairness_gate
-from finwatch.features import run_all
-from finwatch.macro_data import get_macro_snapshot, save_macro_baseline
-from finwatch.models import (
+from finwatch.decision_engine import InterventionEngine  # noqa: E402
+from finwatch.explainability import get_explainer  # noqa: E402
+from finwatch.fairness import disparate_impact_audit, fairness_gate  # noqa: E402
+from finwatch.features import run_all  # noqa: E402
+from finwatch.macro_data import get_macro_snapshot, save_macro_baseline  # noqa: E402
+from finwatch.models import (  # noqa: E402
     evaluate_model,
     select_champion,
     train_lightgbm,
     train_logistic_regression,
     train_xgboost,
 )
-from finwatch.preprocessor import CustomerPreprocessor
+from finwatch.preprocessor import CustomerPreprocessor  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -117,7 +115,7 @@ def main(args):
     # -- 6. Train models ------------------------------------------------------─
     mlflow.set_experiment(args.experiment)
 
-    with mlflow.start_run(run_name=f"finwatch-training"):
+    with mlflow.start_run(run_name="finwatch-training"):
         mlflow.log_params(
             {
                 "n_train": len(X_train_bal),

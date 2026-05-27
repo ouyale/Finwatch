@@ -2,8 +2,7 @@
 preprocessor.py - CustomerPreprocessor
 
 Sklearn-compatible transformer that cleans and encodes Home Credit
-application data. Mirrors the SMEPreprocessor pattern from the
-Stanbic pipeline but adapted for consumer retail banking.
+application data for consumer retail banking vulnerability scoring.
 
 Usage
 -----
@@ -168,8 +167,7 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
         Step 5 - Handle missing values.
 
         External credit bureau scores (EXT_SOURCE_1/2/3) have high missingness
-        (~50-65%). Following the Stanbic pipeline principle: missing bureau score
-        is itself a predictive signal. Strategy:
+        (~50-65%). A missing bureau score is itself a predictive signal. Strategy:
           - Add binary flag: has_ext_source_{n}
           - Fill missing with sentinel value -1 (not median)
         """

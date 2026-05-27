@@ -14,8 +14,6 @@ distribution itself (score PSI is the most sensitive early warning).
 """
 
 import logging
-from pathlib import Path
-from typing import Dict
 
 import numpy as np
 import pandas as pd
