@@ -15,7 +15,6 @@ Usage
 """
 
 import logging
-import warnings
 from typing import Optional
 
 import numpy as np
@@ -23,7 +22,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import StandardScaler
 
-from .constants import DROP_COLS, PROTECTED_COLS, TARGET
+from .constants import DROP_COLS, PROTECTED_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +71,12 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
         df = self._handle_missing(df, fit=True)
 
         if self.scale:
-            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            # Exclude binary flag columns from scaling - they are 0/1 indicators
+            # and scaling them destroys their meaning (e.g. DAYS_EMPLOYED_IS_NA
+            # should stay 0 or 1, not become -0.33 or 3.0).
+            all_numeric = df.select_dtypes(include=[np.number]).columns.tolist()
+            flag_cols = [c for c in all_numeric if c.endswith("_IS_NA") or c.startswith("has_")]
+            numeric_cols = [c for c in all_numeric if c not in flag_cols]
             self._scaler = StandardScaler()
             self._scaler.fit(df[numeric_cols])
             self._scaler_cols = numeric_cols

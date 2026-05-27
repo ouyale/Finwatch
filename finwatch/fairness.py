@@ -18,10 +18,8 @@ Regulatory basis
 """
 
 import logging
-from typing import Optional
 
 import pandas as pd
-import numpy as np
 
 from .constants import DIR_THRESHOLD, FAIRNESS_AUDIT_COLS
 

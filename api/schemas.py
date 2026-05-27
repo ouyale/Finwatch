@@ -8,7 +8,6 @@ Every field has a description so the auto-generated FastAPI docs
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
-
 # -- Request ------------------------------------------------------------------─
 
 

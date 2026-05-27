@@ -13,7 +13,6 @@ TreeExplainer. For Logistic Regression, we use LinearExplainer.
 """
 
 import logging
-from typing import Optional
 
 import numpy as np
 import pandas as pd

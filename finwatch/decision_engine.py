@@ -20,14 +20,12 @@ Intervention tiers
 Design note
 -----------
 Threshold values are NOT hardcoded. Call .calibrate_thresholds() on
-the validation set after training to find the cost-minimising thresholds.
-This mirrors the approach in the Stanbic pipeline but for a 3-tier output.
+the validation set after training to find the cost-minimising thresholds
+for the specific class imbalance and cost asymmetry of this dataset.
 """
 
-import json
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pandas as pd

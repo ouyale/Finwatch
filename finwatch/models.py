@@ -17,7 +17,6 @@ accuracy and ROC-AUC reward predicting the majority class.
 import logging
 from typing import Dict, Tuple
 
-import mlflow
 import numpy as np
 import optuna
 import pandas as pd
