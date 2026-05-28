@@ -21,3 +21,11 @@ target-version = ["py311"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+# macro_data.py makes live HTTP calls to the ONS API - integration tested separately.
+# models.py trains full ML models - too slow for unit tests, integration tested separately.
+omit = [
+    "finwatch/macro_data.py",
+    "finwatch/models.py",
+]

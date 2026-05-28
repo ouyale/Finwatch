@@ -88,7 +88,7 @@ def engineer_enquiry_features(df: pd.DataFrame) -> pd.DataFrame:
     enq_recent = [
         v
         for k, v in enq_cols.items()
-        if k in df.columns and "HOUR" in k or "DAY" in k or "WEEK" in k or "MON" in k
+        if k in df.columns and ("HOUR" in k or "DAY" in k or "WEEK" in k or "MON" in k)
     ]
     if enq_recent:
         df["total_recent_enquiries"] = df[enq_recent].sum(axis=1)
