@@ -32,8 +32,8 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
     End-to-end preprocessing for Home Credit consumer vulnerability data.
 
     Steps (in order - do NOT reorder):
-    1. Drop protected / leakage columns  ← ALWAYS FIRST
-    2. Deduplicate on SK_ID_CURR
+    1. Deduplicate on SK_ID_CURR  ← MUST be before step 2 (ID is dropped there)
+    2. Drop protected / leakage columns
     3. Fix impossible values
     4. Encode categoricals
     5. Handle missing values (sentinel + flag for credit bureau scores)
@@ -65,17 +65,28 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
         logger.info("CustomerPreprocessor.fit() - %d rows, %d cols", *X.shape)
 
         df = X.copy()
+        df = self._deduplicate(df)
         df = self._drop_poison(df)
         df = self._fix_impossible_values(df)
         df = self._encode_categoricals(df, fit=True)
         df = self._handle_missing(df, fit=True)
 
         if self.scale:
-            # Exclude binary flag columns from scaling - they are 0/1 indicators
-            # and scaling them destroys their meaning (e.g. DAYS_EMPLOYED_IS_NA
-            # should stay 0 or 1, not become -0.33 or 3.0).
+            # Exclude binary columns from scaling - scaling a 0/1 column
+            # destroys its meaning (FLAG_EMP_PHONE=1 becomes 3.0, which is
+            # meaningless). Three sources of binary columns:
+            #   1. Columns we create: _IS_NA suffix, has_ prefix
+            #   2. Original FLAG_* columns already in the raw data
+            #   3. Any other column whose values are only 0 and 1
+            # The EDA confirmed 33 binary columns exist in the raw data.
             all_numeric = df.select_dtypes(include=[np.number]).columns.tolist()
-            flag_cols = [c for c in all_numeric if c.endswith("_IS_NA") or c.startswith("has_")]
+            flag_cols = [
+                c for c in all_numeric
+                if c.endswith("_IS_NA")
+                or c.startswith("has_")
+                or c.startswith("FLAG_")
+                or set(df[c].dropna().unique()).issubset({0, 1, 0.0, 1.0})
+            ]
             numeric_cols = [c for c in all_numeric if c not in flag_cols]
             self._scaler = StandardScaler()
             self._scaler.fit(df[numeric_cols])
@@ -92,6 +103,7 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
         """Apply fitted transformations to a dataframe."""
         self._check_fitted()
         df = X.copy()
+        df = self._deduplicate(df)
         df = self._drop_poison(df)
         df = self._fix_impossible_values(df)
         df = self._encode_categoricals(df, fit=False)
@@ -125,8 +137,28 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
 
     # -- Private helpers ------------------------------------------------------─
 
+    def _deduplicate(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Step 1 - Remove duplicate customer records on SK_ID_CURR.
+
+        This must run BEFORE _drop_poison because SK_ID_CURR is dropped there.
+        Keeping the last occurrence preserves the most recent application record
+        in cases where a customer applied multiple times.
+
+        In the Kaggle training data there are no duplicates (confirmed in EDA),
+        so this is a no-op during development. In production, data arriving from
+        multiple source systems can produce duplicate records silently - this
+        prevents those duplicates from corrupting the fitted medians and encodings.
+        """
+        if "SK_ID_CURR" in df.columns:
+            before = len(df)
+            df = df.drop_duplicates(subset=["SK_ID_CURR"], keep="last")
+            dropped = before - len(df)
+            if dropped:
+                logger.warning("Dropped %d duplicate SK_ID_CURR rows.", dropped)
+        return df
+
     def _drop_poison(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Step 1 - ALWAYS FIRST. Drop protected and leakage columns."""
+        """Step 2 - Drop protected and leakage columns."""
         poison = [c for c in self.drop_cols + self.protected_cols if c in df.columns]
         if poison:
             logger.debug("Dropping %d poison columns: %s", len(poison), poison)
@@ -172,6 +204,12 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
         (~50-65%). A missing bureau score is itself a predictive signal. Strategy:
           - Add binary flag: has_ext_source_{n}
           - Fill missing with sentinel value -1 (not median)
+
+        OWN_CAR_AGE is 66% missing because most customers have no car (FLAG_OWN_CAR=0).
+        Filling with the overall car-owner median would assign a non-zero car age to
+        customers who do not own a car - which is wrong. Strategy:
+          - FLAG_OWN_CAR=0 rows: OWN_CAR_AGE = 0 (no car exists)
+          - FLAG_OWN_CAR=1 with missing age: median among car owners only
         """
         ext_sources = [
             c for c in ["EXT_SOURCE_1", "EXT_SOURCE_2", "EXT_SOURCE_3"] if c in df.columns
@@ -179,6 +217,19 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
         for col in ext_sources:
             df[f"has_{col.lower()}"] = df[col].notna().astype(int)
             df[col] = df[col].fillna(-1)
+
+        # OWN_CAR_AGE: conditional imputation based on car ownership flag
+        if "OWN_CAR_AGE" in df.columns and "FLAG_OWN_CAR" in df.columns:
+            # Non-car-owners get 0 - they have no car, so car age is 0
+            df.loc[df["FLAG_OWN_CAR"] == 0, "OWN_CAR_AGE"] = 0
+            # Car owners with missing age get the median age among car owners only
+            car_owner_missing = (df["FLAG_OWN_CAR"] == 1) & df["OWN_CAR_AGE"].isna()
+            if car_owner_missing.any():
+                if fit:
+                    car_owner_median = df.loc[df["FLAG_OWN_CAR"] == 1, "OWN_CAR_AGE"].median()
+                    self._numeric_medians["OWN_CAR_AGE"] = car_owner_median
+                fill_val = self._numeric_medians.get("OWN_CAR_AGE", 0)
+                df.loc[car_owner_missing, "OWN_CAR_AGE"] = fill_val
 
         # All other numeric columns: fill with training median
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()

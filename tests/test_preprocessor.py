@@ -130,3 +130,62 @@ def test_transform_without_fit_raises():
     pp = CustomerPreprocessor()
     with pytest.raises(RuntimeError, match="not been fitted"):
         pp.transform(df)
+
+
+# -- Deduplication on SK_ID_CURR -----------------------------------------------─
+
+def test_duplicates_removed_on_sk_id_curr():
+    """Duplicate SK_ID_CURR rows must be removed before any other step."""
+    df = make_sample_df(10)
+    # Inject two rows with the same SK_ID_CURR - the first should be dropped
+    df.loc[0, "SK_ID_CURR"] = 999999
+    df.loc[1, "SK_ID_CURR"] = 999999
+    y = make_labels(10)
+    pp = CustomerPreprocessor()
+    # fit should not raise and the output should have one fewer row
+    out = pp.fit_transform(df, y)
+    # After deduplication we lose one row: 10 - 1 = 9
+    assert len(out) == 9
+
+
+def test_no_sk_id_curr_column_does_not_crash():
+    """If SK_ID_CURR is absent the deduplication step must be a silent no-op."""
+    df = make_sample_df(10).drop(columns=["SK_ID_CURR"])
+    y = make_labels(10)
+    pp = CustomerPreprocessor()
+    # Should complete without raising
+    out = pp.fit_transform(df, y)
+    assert len(out) == 10
+
+
+# -- OWN_CAR_AGE conditional imputation ----------------------------------------─
+
+def make_car_df() -> pd.DataFrame:
+    """DataFrame with car ownership columns for testing OWN_CAR_AGE logic."""
+    return pd.DataFrame({
+        "FLAG_OWN_CAR": [1,   1,   1,   0,   0],
+        "OWN_CAR_AGE":  [5.0, 10.0, np.nan, np.nan, np.nan],
+        "AMT_INCOME_TOTAL": [100000.0] * 5,
+    })
+
+
+def test_own_car_age_zero_for_non_car_owners():
+    """Customers with FLAG_OWN_CAR=0 must get OWN_CAR_AGE=0, not a median."""
+    df = make_car_df()
+    y = np.array([0, 0, 0, 0, 0])
+    pp = CustomerPreprocessor(scale=False)
+    out = pp.fit_transform(df, y)
+    assert "OWN_CAR_AGE" in out.columns
+    non_owner_rows = out.index[df["FLAG_OWN_CAR"] == 0]
+    assert (out.loc[non_owner_rows, "OWN_CAR_AGE"] == 0).all()
+
+
+def test_own_car_age_uses_car_owner_median_for_car_owners_with_missing():
+    """Car owners with missing OWN_CAR_AGE should receive the car-owner median."""
+    df = make_car_df()
+    # Car owners: ages 5 and 10 are known; the third has NaN - median = 7.5
+    y = np.array([0, 0, 0, 0, 0])
+    pp = CustomerPreprocessor(scale=False)
+    out = pp.fit_transform(df, y)
+    # Row 2 is FLAG_OWN_CAR=1 with missing age - should get median of [5, 10] = 7.5
+    assert out.loc[2, "OWN_CAR_AGE"] == pytest.approx(7.5)
