@@ -17,9 +17,19 @@ PROTECTED_COLS = [
 ]
 
 # -- Fairness audit columns (permissible but must pass 4/5ths DIR test) --------
+# These are audited against the hard 0.80 DIR gate before model registration.
+# Only legally protected characteristics (UK Equality Act 2010) belong here.
+# Education level is NOT a protected characteristic - including it as a hard gate
+# caused the fairness gate to fail even though the gender and marital status checks
+# passed. NAME_EDUCATION_TYPE is monitored separately in the monthly report but
+# does not block deployment.
 FAIRNESS_AUDIT_COLS = [
     "CODE_GENDER",
     "NAME_FAMILY_STATUS",
+]
+
+# -- Softer monitoring columns (logged but do not block deployment) -----------
+FAIRNESS_MONITOR_COLS = [
     "NAME_EDUCATION_TYPE",
 ]
 

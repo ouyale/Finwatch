@@ -1,0 +1,17 @@
+{
+  "saved_at": "2026-05-28T16:44:37.113322",
+  "values": {
+    "cpi_inflation_rate": null,
+    "unemployment_rate": null,
+    "boe_base_rate": null,
+    "energy_price_index": null,
+    "consumer_confidence": null
+  },
+  "stds": {
+    "cpi_inflation_rate": 0.5,
+    "unemployment_rate": 0.5,
+    "boe_base_rate": 0.5,
+    "energy_price_index": 0.5,
+    "consumer_confidence": 0.5
+  }
+}

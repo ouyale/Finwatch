@@ -32,6 +32,7 @@ def disparate_impact_audit(
     positive_label: str = "ESCALATE",
     audit_cols: list = None,
     dir_threshold: float = DIR_THRESHOLD,
+    exclude_values: dict = None,
 ) -> dict:
     """
     Run a disparate impact audit across all fairness audit columns.
@@ -56,6 +57,7 @@ def disparate_impact_audit(
     dict with per-column results and an overall 'all_passed' flag.
     """
     audit_cols = audit_cols or FAIRNESS_AUDIT_COLS
+    exclude_values = exclude_values or {}
     results = {}
     all_passed = True
 
@@ -64,8 +66,18 @@ def disparate_impact_audit(
             logger.warning("Fairness audit column '%s' not found - skipping.", col)
             continue
 
+        col_df = df
+        excluded = exclude_values.get(col, [])
+        if excluded:
+            col_df = df[~df[col].isin(excluded)]
+            logger.info(
+                "Excluding %s from %s fairness audit (data quality sentinels).",
+                excluded,
+                col,
+            )
+
         group_rates = (
-            df.groupby(col)[decision_col]
+            col_df.groupby(col)[decision_col]
             .apply(lambda x: (x == positive_label).mean())
             .reset_index()
             .rename(columns={decision_col: "positive_rate"})

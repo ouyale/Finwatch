@@ -95,6 +95,14 @@ def main(args):
     X_val_feat = run_all(X_val_clean, macro_snapshot)
     X_test_feat = run_all(X_test_clean, macro_snapshot)
 
+    # Engineered features can introduce NaN values that the preprocessor never
+    # sees. For example, ext_source_mean is NaN when all three EXT_SOURCE values
+    # are the -1 sentinel (customer has no bureau data at all). Fill with 0 - a
+    # neutral value for ratio features - before any model or SMOTE sees the data.
+    X_train_feat = X_train_feat.fillna(0)
+    X_val_feat = X_val_feat.fillna(0)
+    X_test_feat = X_test_feat.fillna(0)
+
     # -- 5. SMOTE - training fold ONLY ----------------------------------------
     logger.info("Applying SMOTE to training fold only...")
     smote = SMOTE(random_state=42)
@@ -162,7 +170,11 @@ def main(args):
             pd.DataFrame({"vulnerability_score": champion_model.predict_proba(X_val_feat)[:, 1]})
         )["tier"].values
 
-        audit_result = disparate_impact_audit(fairness_val)
+        # XNA is a data-entry sentinel in the Home Credit dataset (4 rows with
+        # no gender recorded). It is not a real demographic group. Including it
+        # drags the CODE_GENDER DIR to 0.000 (XNA group gets 0 ESCALATE
+        # assignments) causing a spurious fairness failure. Exclude it.
+        audit_result = disparate_impact_audit(fairness_val, exclude_values={"CODE_GENDER": ["XNA"]})
         mlflow.log_dict(audit_result, "fairness_audit.json")
 
         for col, res in audit_result["results"].items():
