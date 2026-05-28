@@ -111,8 +111,14 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
         df = self._handle_missing(df, fit=False)
 
         if self.scale and self._scaler is not None:
-            cols = [c for c in self._scaler_cols if c in df.columns]
-            df[cols] = self._scaler.transform(df[cols])
+            # Add any columns the scaler expects but are absent from this
+            # record (e.g. inference requests that only supply a subset of
+            # fields). sklearn 1.8 validates feature names strictly, so we
+            # must pass the full set of columns the scaler was fitted on.
+            for col in self._scaler_cols:
+                if col not in df.columns:
+                    df[col] = 0
+            df[self._scaler_cols] = self._scaler.transform(df[self._scaler_cols])
 
         # Align to training schema: add missing cols as 0, drop extra cols
         for col in self._feature_names:

@@ -14,6 +14,7 @@ Run locally
 Then open: http://localhost:8000/docs  (interactive Swagger UI)
 """
 
+import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -41,6 +42,26 @@ from finwatch.explainability import explain_single
 from finwatch.features import run_all
 from finwatch.macro_data import get_macro_snapshot
 
+
+def _align_features(X: pd.DataFrame, feature_names: list) -> pd.DataFrame:
+    """
+    Align a feature DataFrame to exactly the columns the model was trained on.
+
+    The training pipeline runs preprocessor -> feature engineering -> fillna(0)
+    before the model sees the data. At inference time the same steps run, but
+    the incoming customer record may have fewer raw columns than the full
+    training dataset. This function handles any remaining gap after feature
+    engineering - it adds missing columns as 0, drops unexpected columns,
+    and reorders to match the training column order exactly.
+
+    feature_names is loaded from data/processed/feature_names.json at startup.
+    """
+    X = X.fillna(0)
+    for col in feature_names:
+        if col not in X.columns:
+            X[col] = 0
+    return X[feature_names]
+
 logger = logging.getLogger(__name__)
 
 # -- Global model state (loaded once on startup) ------------------------------─
@@ -58,6 +79,13 @@ async def lifespan(app: FastAPI):
     _state["explainer"] = joblib.load(artefact_dir / ARTEFACT_SHAP_EXPLAINER)
     _state["engine"] = InterventionEngine.load_thresholds(str(artefact_dir / "thresholds.json"))
     _state["model_version"] = "0.1.0"  # TODO: read from MLflow registry
+
+    # Load the exact feature columns the model was trained on.
+    # Saved by training/train.py as data/processed/feature_names.json.
+    feature_names_path = artefact_dir / "feature_names.json"
+    with open(feature_names_path) as f:
+        _state["feature_names"] = json.load(f)
+    logger.info("Loaded %d feature names.", len(_state["feature_names"]))
 
     logger.info(
         "Model loaded. Thresholds: ESCALATE=%.2f, OUTREACH=%.2f",
@@ -106,9 +134,10 @@ async def score_single(record: CustomerRecord):
         df = pd.DataFrame([record.model_dump()])
         macro_snapshot = get_macro_snapshot()
 
-        # Preprocess → feature engineer → score
+        # Preprocess → feature engineer → align → score
         X_clean = _state["preprocessor"].transform(df)
         X_feat = run_all(X_clean, macro_snapshot)
+        X_feat = _align_features(X_feat, _state["feature_names"])
 
         probability = float(_state["model"].predict_proba(X_feat)[:, 1][0])
 
@@ -116,7 +145,7 @@ async def score_single(record: CustomerRecord):
         shap_features = explain_single(
             _state["explainer"],
             X_feat,
-            _state["preprocessor"].feature_names,
+            _state["feature_names"],
             n_features=5,
         )
 
@@ -160,12 +189,13 @@ async def score_batch(request: BatchRequest):
             df = pd.DataFrame([record.model_dump()])
             X_clean = _state["preprocessor"].transform(df)
             X_feat = run_all(X_clean, macro_snapshot)
+            X_feat = _align_features(X_feat, _state["feature_names"])
             probability = float(_state["model"].predict_proba(X_feat)[:, 1][0])
 
             shap_features = explain_single(
                 _state["explainer"],
                 X_feat,
-                _state["preprocessor"].feature_names,
+                _state["feature_names"],
             )
             decision = _state["engine"].predict_single(
                 customer_id=str(record.SK_ID_CURR),

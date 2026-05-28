@@ -13,7 +13,7 @@ services:
       - ./data/processed:/app/data/processed:ro   # mount model artefacts read-only
       - ./data/external:/app/data/external         # ONS cache (read-write)
     environment:
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_TRACKING_URI=http://mlflow:5001
     depends_on:
       - mlflow
     restart: unless-stopped
@@ -22,7 +22,7 @@ services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.13.0
     ports:
-      - "5000:5000"
+      - "5001:5000"
     volumes:
       - ./mlruns:/mlflow/mlruns
       - ./mlartifacts:/mlflow/mlartifacts
