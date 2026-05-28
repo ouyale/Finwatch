@@ -81,7 +81,8 @@ class CustomerPreprocessor(BaseEstimator, TransformerMixin):
             # The EDA confirmed 33 binary columns exist in the raw data.
             all_numeric = df.select_dtypes(include=[np.number]).columns.tolist()
             flag_cols = [
-                c for c in all_numeric
+                c
+                for c in all_numeric
                 if c.endswith("_IS_NA")
                 or c.startswith("has_")
                 or c.startswith("FLAG_")
