@@ -1,15 +1,16 @@
 # FinWatch: Consumer Financial Vulnerability Early Warning System
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue?logo=python)](https://www.python.org/)
-[![LightGBM](https://img.shields.io/badge/LightGBM-4.3-green)](https://lightgbm.readthedocs.io/)
+[![XGBoost](https://img.shields.io/badge/XGBoost-Champion-green)](https://xgboost.readthedocs.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110-teal)](https://fastapi.tiangolo.com/)
 [![FCA Consumer Duty](https://img.shields.io/badge/FCA-Consumer%20Duty%202023-navy)](https://www.fca.org.uk/firms/consumer-duty)
+[![CI](https://img.shields.io/badge/CI-passing-brightgreen)](https://github.com/ouyale/Finwatch/actions)
+[![Coverage](https://img.shields.io/badge/coverage-82%25-brightgreen)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Coverage: 70%+](https://img.shields.io/badge/coverage-70%25+-brightgreen)](tests/)
 
-Traditional credit models answer one question: will this new applicant default? I built FinWatch to answer a different one - which of our **existing** customers is silently struggling right now, and what should we do about it?
+Traditional credit models answer one question: will this new applicant default? FinWatch answers a different one - which of our **existing** customers is silently struggling right now, and what should we do about it?
 
-This matters because the **FCA Consumer Duty (July 2023)** creates a legal obligation for banks to proactively identify customers in vulnerable circumstances - not wait for them to miss a payment. FinWatch is a full production ML system that continuously scores existing customers for financial vulnerability and routes them to tiered interventions before they reach crisis point.
+The **FCA Consumer Duty (July 2023)** creates a legal obligation for banks to proactively identify customers in vulnerable circumstances - not wait for them to miss a payment. FinWatch is a full production ML system that continuously scores existing customers for financial vulnerability and routes them to tiered interventions before they reach crisis point.
 
 ---
 
@@ -26,7 +27,6 @@ This matters because the **FCA Consumer Duty (July 2023)** creates a legal oblig
 - [Intervention Tiers](#intervention-tiers)
 - [Serving Layer](#serving-layer)
 - [Monitoring](#monitoring)
-- [Dashboard](#dashboard)
 - [Results](#results)
 - [Project Structure](#project-structure)
 - [Quick Start](#quick-start)
@@ -40,7 +40,7 @@ Credit risk modelling has a blind spot. It focuses entirely on the application s
 
 A few things make this problem genuinely hard:
 
-- **Vulnerability is gradual.** A customer who was comfortably managing a mortgage at 2% may be severely stretched at 5.5%. The shift happens across months, not overnight.
+- **Vulnerability is gradual.** A customer comfortably managing a mortgage at 2% may be severely stretched at 5.5%. The shift happens across months, not overnight.
 - **Macro shocks matter.** Energy price spikes, inflation, and base rate rises hit different customer segments differently. A model trained on pre-2022 data has never seen conditions like 2022-2024.
 - **Class imbalance is severe.** Vulnerable customers are a minority. Standard accuracy metrics will flatter a model that simply labels everyone as fine.
 - **Fairness is a legal requirement.** The FCA expects banks to demonstrate that automated systems do not treat protected groups disproportionately.
@@ -88,118 +88,118 @@ DATA SOURCES
 
 I used the [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk) dataset as the core customer feature set. It contains 307,511 loan applications with 122 features covering income, credit amounts, employment history, external credit scores, and demographic attributes.
 
-The target variable is binary: 1 = client with payment difficulties, 0 = performing client. The class imbalance is approximately 8:92, which shaped every modelling decision downstream.
+The target variable is binary: 1 = client with payment difficulties, 0 = performing client. The class imbalance is **11.4:1** - only 8.1% of customers are vulnerable. This shaped every modelling decision downstream.
 
-On top of the Home Credit features, I append five live macroeconomic indicators pulled from the **ONS (Office for National Statistics) API** at scoring time:
+On top of the Home Credit features, I append five live macroeconomic indicators from the **ONS API** at scoring time:
 
 | Indicator | Why it matters |
 |-----------|----------------|
 | Bank of England base rate | Directly affects variable mortgage and loan repayment costs |
-| CPI (inflation) | Erodes real disposable income |
+| CPI inflation | Erodes real disposable income |
 | Unemployment rate | Signals labour market stress |
 | Household energy expenditure | A major fixed cost that squeezes budgets during energy shocks |
 | GfK consumer confidence | Forward-looking sentiment indicator |
 
-These are appended as constant columns to every row - every customer is scored against the same current macroeconomic environment. The baseline values at training time are saved, and drift detection flags if any indicator moves more than 1.5 standard deviations from that baseline.
+These are appended as constant columns to every row - every customer is scored against the same current macroeconomic environment. The baseline values at training time are saved and drift detection flags if any indicator moves more than 1.5 standard deviations from that baseline.
 
 ---
 
 ## Exploratory Data Analysis
 
-Before writing a single line of preprocessing or modelling code, I ran a full EDA in `notebooks/01_EDA.ipynb`. The findings that shaped the rest of the project:
+Before writing a single line of preprocessing code, I ran a full EDA in `notebooks/01_EDA.ipynb`. Key findings that shaped the rest of the project:
 
-**Target distribution.** 8.07% positive rate confirms severe class imbalance. ROC-AUC will be misleading here - I chose PR-AUC as the primary evaluation metric.
+**Class imbalance: 11.4:1.** Only 8.1% of customers are vulnerable. A model predicting "not vulnerable" for everyone would be 91.9% accurate and completely useless. This is why I chose PR-AUC as the evaluation metric rather than accuracy or ROC-AUC.
 
-**Missing values.** `EXT_SOURCE_2` is 8% missing, `AMT_GOODS_PRICE` is 0.3% missing. Rates are low enough that median/mode imputation is appropriate.
+**Missing data is informative (MNAR).** The three external credit bureau scores (EXT_SOURCE_1/2/3) are 56%, 20%, and 0.2% missing respectively. The vulnerability rate for customers with EXT_SOURCE_1 missing is significantly higher than for customers where it is present. The absence is a signal - the customer has a thin or no credit file. Imputing with median would erase that signal. Instead, I create a binary flag (`has_ext_source_n`) and fill the missing value with a sentinel -1.
 
-**External credit scores.** `EXT_SOURCE_2` shows the clearest separation between target classes of any individual feature.
+**Median over mean.** AMT_INCOME_TOTAL has skewness of 392 - a small number of very high earners pull the mean far above what is representative for most customers. All numeric imputation uses the training median.
 
-**Financial ratios.** Raw credit amounts are not particularly predictive. The ratio of credit to income, and of annuity to income, carry far more signal.
+**33 binary columns must not be scaled.** StandardScaler would convert FLAG_EMP_PHONE=1 to 3.0, which is meaningless. The EDA confirmed 33 binary columns in the raw data. I exclude all of them from scaling.
 
-**Protected attributes.** The gender split is approximately 66% female, 34% male. Checking disparate impact at the EDA stage confirmed no obviously discriminatory signals before modelling.
+**Property columns are structural, not random.** Columns like COMMONAREA_AVG are 70%+ missing because renters do not have property data. NAME_HOUSING_TYPE already captures this with six categories each having distinct vulnerability rates - adding a binary IS_RENTER column would lose that nuance.
 
 ---
 
 ## Preprocessing
 
-The `CustomerPreprocessor` class in `finwatch/preprocessor.py` handles all data cleaning. I implemented it as a fitted transformer - it learns statistics from training data during `.fit()`, saves them, and applies those exact saved values at scoring time via `.transform()`.
+The `CustomerPreprocessor` class in `finwatch/preprocessor.py` handles all data cleaning. It is implemented as a fitted sklearn transformer - it learns statistics from training data during `.fit()`, saves them, and applies those exact saved values at scoring time via `.transform()`. This prevents leakage from inference data into the preprocessing statistics.
 
-This distinction matters. A script that recalculates statistics from inference-time data would behave differently at test time than at training time, making reported metrics unreliable and production behaviour unpredictable.
+Steps in order (reordering would introduce bugs):
 
-Steps in order:
-
-1. **Missing value imputation** - numeric columns filled with training median, categoricals with training mode
-2. **Categorical encoding** - binary categoricals label-encoded, multi-value categoricals one-hot encoded
-3. **Numeric scaling** - StandardScaler fitted on training set only
-4. **Macro feature append** - five ONS indicators appended after all other transformations
-
-The fitted preprocessor is serialised to `data/processed/preprocessor.pkl` after training and loaded at API startup. The model and preprocessor always move together - they must be version-matched.
+1. **Deduplicate on SK_ID_CURR** - must run before ID is dropped. Production data from multiple source systems can silently produce duplicate customer records.
+2. **Drop protected and leakage columns** - SK_ID_CURR, REGION.
+3. **Fix impossible values** - DAYS_BIRTH outside 18-100 years, DAYS_EMPLOYED=365243 sentinel for unemployed (flagged and NaN'd), negative income.
+4. **Encode categoricals** - ordinal encoding with -1 for unknown categories seen at inference time.
+5. **Handle missing values** - EXT_SOURCE: flag + sentinel -1. OWN_CAR_AGE: 0 for non-car-owners, car-owner median for car-owners with missing age. All other numerics: training median.
+6. **Scale numerics** - StandardScaler excluding all binary columns.
+7. **Align schema** - add missing columns as 0, reorder to training schema. Ensures consistent feature order at inference time.
 
 ---
 
 ## Feature Engineering
 
-Raw columns often carry less signal than their relationships with each other. `finwatch/features.py` creates three categories of derived features:
+Raw columns often carry less signal than their relationships. `finwatch/features.py` creates derived features across three categories:
 
-**Financial stress ratios:**
-- `credit_to_income_ratio` - how many years of gross salary is the debt?
-- `annuity_to_income_ratio` - what fraction of income goes to loan repayments?
-- `goods_to_credit_ratio` - how much of the credit was for goods vs administrative costs?
+**Financial stress ratios** capture the relationship between credit obligation and financial capacity - the primary signals for vulnerability:
+- `credit_to_income_ratio` - how many years of gross income is the total debt?
+- `annuity_to_income_ratio` - what fraction of income goes to repayments each year?
+- `credit_to_goods_ratio` - how much of the credit exceeds the goods value? A large gap suggests cash extraction.
+- `ext_source_mean / min / std` - aggregate of the three credit bureau scores, treating -1 sentinel as missing.
 
 **Employment stability:**
-- `days_employed_pct_of_age` - what proportion of your life have you been employed? A 50-year-old with 2 years of employment tells a different story than a 25-year-old in the same position. Raw DAYS_EMPLOYED cannot capture this.
+- `days_employed_pct_of_age` - what proportion of your life have you been employed? A 50-year-old with 2 years of employment tells a different story than a 25-year-old in the same position.
 
-**Binary flags:**
-- `is_high_credit_to_income` - threshold flag at credit/income > 5
-- `is_young_borrower` - age under 30
-
-I kept the feature set focused rather than exhaustive. On a regulated system, every feature needs to be justifiable to a compliance team.
+**Credit bureau enquiry counts** across six time windows (hour, day, week, month, quarter, year) - multiple recent enquiries signal financial stress and rejected applications elsewhere.
 
 ---
 
 ## Modelling
 
-### Why gradient boosting over deep learning
+### Why gradient boosting
 
-Deep learning was not in contention. The literature is clear that on tabular datasets without spatial or sequential structure, gradient boosting consistently outperforms neural networks (Grinsztajn et al., 2022). The Home Credit dataset sits comfortably within the regime where gradient boosting dominates. It also trains much faster and produces SHAP explanations natively - non-negotiable for a regulated deployment.
+On tabular datasets without spatial or sequential structure, gradient boosting consistently outperforms neural networks (Grinsztajn et al., 2022). The reason is that tabular data is heterogeneous - features have different scales, distributions, and relationships that tree ensembles handle naturally. Neural networks require extensive feature engineering and regularisation to match gradient boosting on this kind of data. Tree-based models also produce SHAP explanations natively - non-negotiable for a regulated deployment where every decision needs to be explainable to a compliance team and to the customer.
+
+I trained three candidates - Logistic Regression as a baseline, LightGBM, and XGBoost - to let the data pick the winner rather than assuming upfront.
 
 ### Handling class imbalance
 
-I used SMOTE (Synthetic Minority Over-sampling Technique) rather than class weighting alone. Class weighting adjusts the loss function but the model still sees only those same 8% of real examples. SMOTE generates synthetic minority examples by interpolating between existing ones in feature space, giving the model more diverse examples to learn from.
-
-**Critical constraint:** SMOTE is applied only to the training fold, never before the train/validation split. Applying it earlier would let synthetic examples contaminate the validation set, making performance metrics unreliable.
+I used SMOTE (Synthetic Minority Over-sampling Technique) applied to the **training fold only**. SMOTE generates synthetic minority examples by interpolating between existing ones in feature space. Applying it before the train/validation split would let synthetic data contaminate validation metrics - the reported PR-AUC would be measuring performance on artificial data, not real customers.
 
 ### Hyperparameter optimisation
 
-I used Optuna with TPE (Tree-structured Parzen Estimator) Bayesian optimisation for 50 trials on both LightGBM and XGBoost. TPE builds a probabilistic model of which hyperparameter regions produce good results and focuses search there - far more efficient than random or grid search.
+Optuna with TPE (Tree-structured Parzen Estimator) Bayesian optimisation for 50 trials on both LightGBM and XGBoost. TPE builds a probabilistic model of which hyperparameter regions produce good results and focuses search there - far more efficient than grid or random search.
 
 ### Champion selection
 
-All three candidates are compared on PR-AUC on the validation set. I chose PR-AUC over ROC-AUC because ROC-AUC is inflated by the majority class. A model that labels everyone as fine will still achieve a high ROC-AUC. PR-AUC cannot be fooled this way - it focuses entirely on how well the model identifies the vulnerable minority.
+All three candidates are evaluated on PR-AUC on the held-out validation set. PR-AUC cannot be fooled by class imbalance the way ROC-AUC can - it focuses entirely on how well the model identifies the vulnerable minority.
 
-### Probability calibration and threshold optimisation
+![Model Comparison](assets/model_comparison.png)
 
-Raw model outputs are calibrated with Platt scaling (CalibratedClassifierCV). I then sweep every threshold from 0.01 to 0.99, computing:
+### Threshold calibration
+
+I sweep every threshold from 0.01 to 0.99 and compute:
 
 ```
 cost = (false_negatives * 5) + (false_positives * 1)
 ```
 
-The 5:1 asymmetry reflects the regulatory reality: missing a vulnerable customer is substantially more harmful than flagging someone who turns out to be fine. The threshold minimising this cost is saved with the model artefacts.
+The 5:1 asymmetry reflects the regulatory reality - missing a vulnerable customer is substantially more harmful than flagging someone who turns out to be fine. The threshold minimising this cost becomes the ESCALATE boundary. The OUTREACH boundary uses a 2:1 cost ratio.
 
 ---
 
 ## Fairness and Compliance
 
-Before any model is registered to MLflow, it must pass the **FCA 4/5ths disparate impact test**. This is a hard gate - a failing model raises a `ValueError` and is never deployed.
+Before any model is registered to MLflow, it must pass the **FCA 4/5ths disparate impact test**. This is a hard gate - a failing model raises a `ValueError` and is never saved or deployed regardless of its accuracy metrics.
 
-The Disparate Impact Ratio (DIR) is computed for gender, family status, and education type:
+The Disparate Impact Ratio (DIR) is computed for each protected characteristic:
 
 ```
-DIR = (ESCALATE rate of disadvantaged group) / (ESCALATE rate of most-advantaged group)
+DIR = ESCALATE rate of least-advantaged group / ESCALATE rate of most-advantaged group
 ```
 
-Threshold: DIR >= 0.80. Monthly fairness audit results are logged to `data/processed/fairness_log.parquet`.
+Threshold: DIR >= 0.80. Only legally protected characteristics under the UK Equality Act 2010 are used as hard gate columns. XNA rows (4 records with no gender recorded) are excluded from the gender calculation as a data quality artefact, not a real demographic group.
+
+![Fairness Audit](assets/fairness_audit.png)
 
 This system also satisfies **UK GDPR Article 22** via SHAP values - every individual scoring decision is accompanied by the top contributing features and their direction of influence.
 
@@ -207,13 +207,15 @@ This system also satisfies **UK GDPR Article 22** via SHAP values - every indivi
 
 ## Intervention Tiers
 
+Thresholds are calibrated per model run, not hardcoded. After the last training run:
+
 | Score | Tier | Action |
 |-------|------|--------|
-| >= 0.70 | ESCALATE | Immediate outreach - assign to specialist vulnerability team |
-| 0.40 - 0.70 | OUTREACH | Proactive contact - offer support products, payment holidays |
-| < 0.40 | MONITOR | No action required - continue standard monitoring |
+| >= 0.10 | ESCALATE | Immediate outreach - assign to specialist vulnerability team |
+| 0.06 - 0.10 | OUTREACH | Proactive contact - offer support products, payment holidays |
+| < 0.06 | MONITOR | Continue standard monitoring |
 
-Thresholds are calibrated per model run, not hardcoded.
+![Tier Distribution](assets/tier_distribution.png)
 
 ---
 
@@ -231,13 +233,13 @@ Request validation is handled by Pydantic v2 schemas. Invalid inputs are rejecte
 
 ## Monitoring
 
-`monitoring/psi_monitor.py` implements PSI drift detection:
+`monitoring/psi_monitor.py` implements Population Stability Index drift detection:
 
 | PSI | Interpretation | Action |
 |-----|----------------|--------|
 | < 0.10 | No significant change | None |
 | 0.10 - 0.20 | Moderate shift | Monitor |
-| > 0.20 | Significant shift | Review / retrain |
+| > 0.20 | Significant shift | Review and retrain |
 
 Three retraining triggers:
 1. **Scheduled** - monthly baseline retrain
@@ -246,22 +248,24 @@ Three retraining triggers:
 
 ---
 
-## Dashboard
-
-The Streamlit dashboard in `dashboard/app.py` has four pages:
-
-- **Portfolio Overview** - KPI cards, tier donut chart, score distribution histogram
-- **Score a Customer** - live API call with SHAP explanation chart
-- **Drift Monitor** - PSI values per feature with threshold reference lines
-- **Fairness Audit** - DIR trend over time, audit log
-
-Includes demo mode with synthetic data when no model artefacts exist yet.
-
----
-
 ## Results
 
-*To be updated after training. Will include PR-AUC on OOT test set, calibrated threshold, confusion matrix, fairness audit results, and tier distribution.*
+| Metric | Value |
+|--------|-------|
+| Champion model | XGBoost |
+| Test PR-AUC | **0.1877** |
+| Test ROC-AUC | **0.6850** |
+| Random baseline PR-AUC | 0.081 |
+| Lift over baseline | 2.3x |
+| Gender DIR (PASSED) | 0.955 |
+| Family Status DIR (PASSED) | 0.859 |
+| Test suite | 44 tests, 82% coverage |
+| Customers scored (validation) | 61,502 |
+| ESCALATE | 1,608 (2.6%) |
+| OUTREACH | 12,135 (19.7%) |
+| MONITOR | 47,759 (77.6%) |
+
+A PR-AUC of 0.1877 on an 11.4:1 imbalanced problem is 2.3x better than random. No single feature has a correlation above 0.20 with the target - the model works by combining hundreds of weak signals through gradient boosting, not by finding one strong predictor.
 
 ---
 
@@ -269,25 +273,24 @@ Includes demo mode with synthetic data when no model artefacts exist yet.
 
 ```
 FinWatch/
-|-- finwatch/                   # Core Python package
-|   |-- constants.py
-|   |-- preprocessor.py         # CustomerPreprocessor
-|   |-- features.py             # Feature engineering
-|   |-- macro_data.py           # ONS API client
-|   |-- models.py               # Training + Optuna HPO
-|   |-- decision_engine.py      # InterventionEngine
-|   |-- fairness.py             # Disparate impact audit
-|   |-- explainability.py       # SHAP wrapper
+|- finwatch/                   # Core Python package
+|  |- constants.py             # Single source of truth for thresholds and config
+|  |- preprocessor.py          # CustomerPreprocessor - sklearn-compatible transformer
+|  |- features.py              # Feature engineering - ratios, flags, enquiry counts
+|  |- macro_data.py            # ONS API client - live UK economic indicators
+|  |- models.py                # Training + Optuna HPO for LightGBM and XGBoost
+|  |- decision_engine.py       # InterventionEngine - score to tier conversion
+|  |- fairness.py              # Disparate impact audit - FCA 4/5ths gate
+|  |- explainability.py        # SHAP TreeExplainer wrapper
 |
-|-- training/train.py           # End-to-end CLI training pipeline
-|-- api/main.py                 # FastAPI serving layer
-|-- api/schemas.py              # Pydantic request/response models
-|-- monitoring/psi_monitor.py   # PSI drift detection
-|-- dashboard/app.py            # Streamlit dashboard
-|-- tests/                      # pytest suite (70%+ coverage gate)
-|-- notebooks/01_EDA.ipynb
-|-- docker-compose.yml
-|-- requirements.txt
+|- training/train.py           # End-to-end CLI training pipeline
+|- api/main.py                 # FastAPI serving layer
+|- api/schemas.py              # Pydantic request/response models
+|- monitoring/psi_monitor.py   # PSI drift detection
+|- dashboard/app.py            # Streamlit dashboard
+|- tests/                      # pytest suite (44 tests, 82% coverage gate)
+|- notebooks/01_EDA.ipynb      # Full exploratory data analysis
+|- docker-compose.yml          # API + MLflow + Dashboard in containers
 ```
 
 ---
@@ -295,8 +298,9 @@ FinWatch/
 ## Quick Start
 
 ```bash
-git clone https://github.com/ouyale/finwatch.git
-cd finwatch
+git clone https://github.com/ouyale/Finwatch.git
+cd Finwatch
+pip install -e .
 pip install -r requirements.txt
 ```
 
@@ -318,21 +322,20 @@ docker-compose up --build
 
 ## Tech Stack
 
-| Component | Technology | Why |
-|-----------|-----------|-----|
-| Core ML | LightGBM + XGBoost | Production standard for tabular financial data |
-| HPO | Optuna (TPE) | Bayesian search, 50 trials with pruning |
-| Calibration | Platt Scaling | Honest probabilities for threshold optimisation |
-| Imbalance | SMOTE (train fold only) | Diverse minority examples without leakage |
-| Fairness | 4/5ths rule (DIR >= 0.80) | FCA-adopted disparate impact threshold |
-| Explainability | SHAP TreeExplainer | Exact explanations satisfying UK GDPR Art. 22 |
-| Drift | PSI | Industry-standard feature drift metric |
-| Experiment tracking | MLflow | Model registry and artefact storage |
-| API | FastAPI + Pydantic v2 | Auto-generated docs, schema validation |
-| Dashboard | Streamlit + Plotly | Portfolio intelligence UI |
-| Containerisation | Docker + docker-compose | Reproducible deployment |
-| CI/CD | GitHub Actions | Lint + test + coverage gate on every push |
-| Macro features | ONS API | Live UK economic indicators |
+| Component | Technology |
+|-----------|-----------|
+| Core ML | LightGBM + XGBoost |
+| HPO | Optuna (TPE Bayesian search) |
+| Imbalance | SMOTE (train fold only) |
+| Fairness | 4/5ths rule (DIR >= 0.80) |
+| Explainability | SHAP TreeExplainer |
+| Drift detection | Population Stability Index |
+| Experiment tracking | MLflow |
+| API | FastAPI + Pydantic v2 |
+| Dashboard | Streamlit + Plotly |
+| Containerisation | Docker + docker-compose |
+| CI/CD | GitHub Actions |
+| Macro features | ONS API |
 
 ---
 
@@ -340,12 +343,11 @@ docker-compose up --build
 
 | Regulation | Relevance |
 |-----------|-----------|
-| FCA Consumer Duty (2023) | Proactive identification of vulnerable customers - primary mandate |
+| FCA Consumer Duty (2023) | Proactive identification of vulnerable customers |
 | FCA PS21/11 | Fair treatment of vulnerable customers |
 | UK GDPR Article 22 | Right to explanation for automated decisions |
 | PRA SS1/23 | Model validation, monitoring, and challenger processes |
 
 ---
 
-**Barbara Werobaobayi**
-MSc Machine Learning and Deep Learning, University of Strathclyde
+**Barbara Werobaobayi** | ML Engineer
