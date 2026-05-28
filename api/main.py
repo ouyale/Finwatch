@@ -62,6 +62,7 @@ def _align_features(X: pd.DataFrame, feature_names: list) -> pd.DataFrame:
             X[col] = 0
     return X[feature_names]
 
+
 logger = logging.getLogger(__name__)
 
 # -- Global model state (loaded once on startup) ------------------------------─
