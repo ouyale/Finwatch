@@ -47,3 +47,5 @@ htmlcov/
 # Logs
 *.log
 logs/
+
+.coverage*
