@@ -38,13 +38,13 @@ The **FCA Consumer Duty (July 2023)** changed that. Banks now have a legal oblig
 
 ## The Problem
 
-Credit risk modelling has a blind spot. It focuses entirely on the application stage, once a loan is approved, most banks know very little about how a customer's financial position evolves over time. By the time distress signals appear in payment data, it is often too late to intervene meaningfully.
+Credit risk modelling has a blind spot. It focuses entirely on the application stage; once a loan is approved, most banks know very little about how a customer's financial position evolves over time. By the time distress signals appear in payment data, it is often too late to intervene meaningfully.
 
 A few things make this problem hard:
 
-- Vulnerability is gradual. A customer comfortably managing a mortgage at 2% may be severely stretched at 5.5%. The shift happens across months, not overnight.
+- Vulnerability is gradual. A customer comfortably managing a mortgage at 2% may be severely stretched at 5.5%. This shift happens across months.
 - Macro shocks matter. Energy price spikes, inflation, and base rate rises hit different customer segments differently. A model trained on pre-2022 data has never seen conditions like 2022-2024.
-- Class imbalance is severe. Vulnerable customers are a minority. Standard accuracy metrics will flatter a model that simply labels everyone as fine.
+- Class imbalance is severe. Vulnerable customers are a minority.
 - Fairness is a legal requirement. The FCA expects banks to demonstrate that automated systems do not treat protected groups disproportionately.
 
 ---
@@ -88,11 +88,11 @@ DATA SOURCES
 
 I used the [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk) dataset as the core customer feature set. It contains 307,511 loan applications with 122 features covering income, credit amounts, employment history, external credit scores, and demographic attributes.
 
-The target variable is binary: 1 = client with payment difficulties, 0 = performing client. The class imbalance is **11.4:1** - only 8.1% of customers are vulnerable. This shaped every modelling decision downstream.
+The target variable is binary: 1 = client with payment difficulties, 0 = performing client. The class imbalance is **11.4:1** - only 8.1% of customers are vulnerable. 
 
 On top of the Home Credit features, I append five live macroeconomic indicators from the **ONS API** at scoring time:
 
-| Indicator | Why it matters |
+| Indicator | Reasoning |
 |-----------|----------------|
 | Bank of England base rate | Directly affects variable mortgage and loan repayment costs |
 | CPI inflation | Erodes real disposable income |
@@ -152,23 +152,23 @@ Credit bureau enquiry counts across six time windows (hour, day, week, month, qu
 
 ## Modelling
 
-### Why gradient boosting
+### Gradient boosting
 
-On tabular datasets without spatial or sequential structure, gradient boosting consistently outperforms neural networks (Grinsztajn et al., 2022). Tabular data is heterogeneous - features have different scales, distributions, and relationships that tree ensembles handle naturally. Neural networks require extensive feature engineering and regularisation to match gradient boosting on this kind of data. Tree-based models also produce SHAP explanations natively, which is non-negotiable for a regulated deployment where every decision needs to be explainable to a compliance team and to the customer.
+Gradient boosting is well established for this type of problem - tabular data with mixed feature types and no spatial or sequential structure. The other reason I went with it is SHAP: tree-based models produce native explanations, and for a regulated deployment where every decision has to be justifiable, that's not optional.
 
 I ran three candidates: Logistic Regression as a sanity-check baseline, LightGBM, and XGBoost. XGBoost won on PR-AUC.
 
 ### Handling class imbalance
 
-I used SMOTE (Synthetic Minority Over-sampling Technique) applied to the **training fold only**. SMOTE generates synthetic minority examples by interpolating between existing ones in feature space. Applying it before the train/validation split would let synthetic data contaminate validation metrics - the reported PR-AUC would be measuring performance on artificial data, not real customers.
+I used SMOTE (Synthetic Minority Over-sampling Technique) applied to the **training fold only**. SMOTE generates synthetic minority examples by interpolating between existing ones in feature space.
 
 ### Hyperparameter optimisation
 
-Optuna with TPE (Tree-structured Parzen Estimator) Bayesian optimisation for 50 trials on both LightGBM and XGBoost. TPE builds a probabilistic model of which hyperparameter regions produce good results and focuses search there - far more efficient than grid or random search.
+Optuna with TPE (Tree-structured Parzen Estimator) Bayesian optimisation for 50 trials on both LightGBM and XGBoost. TPE builds a probabilistic model of which hyperparameter regions produce good results and focuses the search there, far more efficiently than grid or random search.
 
 ### Champion selection
 
-All three candidates are evaluated on PR-AUC on the held-out validation set. PR-AUC cannot be fooled by class imbalance the way ROC-AUC can - it focuses entirely on how well the model identifies the vulnerable minority.
+All three candidates are evaluated on PR-AUC on the held-out validation set. PR-AUC focuses entirely on how well the model identifies the vulnerable minority.
 
 ![Model Comparison](assets/model_comparison.png)
 
@@ -259,7 +259,7 @@ Retraining is triggered in three cases: on a monthly schedule, when PSI exceeds 
 | OUTREACH | 12,135 (19.7%) |
 | MONITOR | 47,759 (77.6%) |
 
-0.1877 PR-AUC on an 11.4:1 imbalanced problem is 2.3x better than random. No single feature correlates above 0.20 with the target - there's no silver bullet here, the model works by combining hundreds of weak signals.
+0.1877 PR-AUC on an 11.4:1 imbalanced problem is 2.3x better than random. No single feature correlates above 0.20 with the target -the model works by combining hundreds of weak signals.
 
 ---
 
