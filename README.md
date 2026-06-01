@@ -1,5 +1,7 @@
 # FinWatch: Consumer Financial Vulnerability Early Warning System
 
+![FinWatch Dashboard](assets/Finwatch.png)
+
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue?logo=python)](https://www.python.org/)
 [![XGBoost](https://img.shields.io/badge/XGBoost-Champion-green)](https://xgboost.readthedocs.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110-teal)](https://fastapi.tiangolo.com/)
