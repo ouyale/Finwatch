@@ -1,7 +1,5 @@
 # FinWatch: Consumer Financial Vulnerability Early Warning System
 
-![FinWatch Dashboard](assets/Finwatch.png)
-
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue?logo=python)](https://www.python.org/)
 [![XGBoost](https://img.shields.io/badge/XGBoost-Champion-green)](https://xgboost.readthedocs.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110-teal)](https://fastapi.tiangolo.com/)
@@ -9,6 +7,8 @@
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen)](https://github.com/ouyale/Finwatch/actions)
 [![Coverage](https://img.shields.io/badge/coverage-82%25-brightgreen)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+![FinWatch Dashboard](assets/Finwatch.png)
 
 Traditional credit models answer one question: will this new applicant default? FinWatch answers a different one - which of our **existing** customers is silently struggling right now, and what should we do about it?
 
