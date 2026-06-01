@@ -10,9 +10,9 @@
 
 ![FinWatch Dashboard](assets/Finwatch.png)
 
-Traditional credit models answer one question: will this new applicant default? FinWatch answers a different one - which of our **existing** customers is silently struggling right now, and what should we do about it?
+Most credit risk work focuses on one moment: the application. Once a loan is approved, banks largely stop paying attention - until a payment is missed. By then it's usually too late.
 
-The **FCA Consumer Duty (July 2023)** creates a legal obligation for banks to proactively identify customers in vulnerable circumstances - not wait for them to miss a payment. FinWatch is a full production ML system that continuously scores existing customers for financial vulnerability and routes them to tiered interventions before they reach crisis point.
+The **FCA Consumer Duty (July 2023)** changed that. Banks now have a legal obligation to proactively identify customers who are struggling, before they reach crisis point. I built FinWatch to do exactly that - a full production ML system that scores existing customers for financial vulnerability and routes them into tiered interventions based on their risk level.
 
 ---
 
@@ -106,17 +106,15 @@ These are appended as constant columns to every row - every customer is scored a
 
 ## Exploratory Data Analysis
 
-Before writing a single line of preprocessing code, I ran a full EDA in `notebooks/01_EDA.ipynb`. Key findings that shaped the rest of the project:
+Before writing a single line of preprocessing code, I ran a full EDA in `notebooks/01_EDA.ipynb`. A few things came out of it that changed how I approached the rest of the project.
 
-Only 8.1% of customers are vulnerable. A model predicting "not vulnerable" for everyone would be 91.9% accurate and completely useless. This is why I chose PR-AUC as the evaluation metric rather than accuracy or ROC-AUC.
+The class imbalance is 11.4:1 - only 8.1% of customers are in the positive class. A model that predicts "not vulnerable" for everyone scores 91.9% accuracy. That's the first trap. It's why I use PR-AUC as the primary metric throughout - it can't be flattered by a model that ignores the minority class.
 
-The three external credit bureau scores (EXT_SOURCE_1/2/3) are 56%, 20%, and 0.2% missing respectively. The vulnerability rate for customers with EXT_SOURCE_1 missing is significantly higher than for customers where it is present. The absence is a signal - the customer has a thin or no credit file. Imputing with median would erase that signal. Instead, I create a binary flag (`has_ext_source_n`) and fill the missing value with a sentinel -1.
+The missingness in EXT_SOURCE_1/2/3 (56%, 20%, and 0.2% respectively) is not random. Customers with a missing EXT_SOURCE_1 have a noticeably higher vulnerability rate than those where it's present - the absence means no credit file, which is itself a signal. Imputing with median would erase that. Instead I flag the missingness with a binary column and fill the value with a sentinel -1.
 
-AMT_INCOME_TOTAL has skewness of 392 - a small number of very high earners pull the mean far above what is representative for most customers. All numeric imputation uses the training median.
+AMT_INCOME_TOTAL has skewness of 392. A handful of very high earners drag the mean far from what's typical, so all numeric imputation uses the training median. I also found 33 binary columns in the raw data - FLAG_* columns and similar - that have to be excluded from StandardScaler, since scaling a 0/1 column produces values like 3.0 that mean nothing.
 
-StandardScaler would convert FLAG_EMP_PHONE=1 to 3.0, which is meaningless. The EDA confirmed 33 binary columns in the raw data. All of them are excluded from scaling.
-
-Columns like COMMONAREA_AVG are 70%+ missing because renters do not have property data. NAME_HOUSING_TYPE already captures this with six categories each having distinct vulnerability rates - adding a binary IS_RENTER column would lose that nuance.
+COMMONAREA_AVG and similar property columns are 70%+ missing because renters don't have that data. NAME_HOUSING_TYPE already captures housing situation with six categories and distinct vulnerability rates per group - I left it as is rather than engineering a redundant flag.
 
 ---
 
@@ -158,7 +156,7 @@ Credit bureau enquiry counts across six time windows (hour, day, week, month, qu
 
 On tabular datasets without spatial or sequential structure, gradient boosting consistently outperforms neural networks (Grinsztajn et al., 2022). Tabular data is heterogeneous - features have different scales, distributions, and relationships that tree ensembles handle naturally. Neural networks require extensive feature engineering and regularisation to match gradient boosting on this kind of data. Tree-based models also produce SHAP explanations natively, which is non-negotiable for a regulated deployment where every decision needs to be explainable to a compliance team and to the customer.
 
-I trained three candidates - Logistic Regression as a baseline, LightGBM, and XGBoost - to let the data pick the winner rather than assuming upfront.
+I ran three candidates: Logistic Regression as a sanity-check baseline, LightGBM, and XGBoost. XGBoost won on PR-AUC.
 
 ### Handling class imbalance
 
@@ -261,7 +259,7 @@ Retraining is triggered in three cases: on a monthly schedule, when PSI exceeds 
 | OUTREACH | 12,135 (19.7%) |
 | MONITOR | 47,759 (77.6%) |
 
-A PR-AUC of 0.1877 on an 11.4:1 imbalanced problem is 2.3x better than random. No single feature has a correlation above 0.20 with the target - the model works by combining hundreds of weak signals through gradient boosting, not by finding one strong predictor.
+0.1877 PR-AUC on an 11.4:1 imbalanced problem is 2.3x better than random. No single feature correlates above 0.20 with the target - there's no silver bullet here, the model works by combining hundreds of weak signals.
 
 ---
 
