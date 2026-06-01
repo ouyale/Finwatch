@@ -10,9 +10,9 @@
 
 ![FinWatch Dashboard](assets/Finwatch.png)
 
-Most credit risk work focuses on one moment: the application. Once a loan is approved, banks largely stop paying attention - until a payment is missed. By then it's usually too late.
+Most credit risk work focuses on the application. Once a loan is approved, banks largely stop paying attention until a payment is missed. By then, it's usually too late.
 
-The **FCA Consumer Duty (July 2023)** changed that. Banks now have a legal obligation to proactively identify customers who are struggling, before they reach crisis point. I built FinWatch to do exactly that - a full production ML system that scores existing customers for financial vulnerability and routes them into tiered interventions based on their risk level.
+The **FCA Consumer Duty (July 2023)** changed that. Banks now have a legal obligation to proactively identify customers who are struggling, before they reach a crisis point. I built FinWatch to do exactly that; it's a full production ML system that scores existing customers for financial vulnerability and routes them into tiered interventions based on their risk level.
 
 ---
 
@@ -38,7 +38,7 @@ The **FCA Consumer Duty (July 2023)** changed that. Banks now have a legal oblig
 
 ## The Problem
 
-Credit risk modelling has a blind spot. It focuses entirely on the application stage - once a loan is approved, most banks know very little about how a customer's financial position evolves over time. By the time distress signals appear in payment data, it is often too late to intervene meaningfully.
+Credit risk modelling has a blind spot. It focuses entirely on the application stage, once a loan is approved, most banks know very little about how a customer's financial position evolves over time. By the time distress signals appear in payment data, it is often too late to intervene meaningfully.
 
 A few things make this problem hard:
 
